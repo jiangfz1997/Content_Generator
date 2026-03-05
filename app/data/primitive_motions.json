@@ -1,0 +1,20 @@
+[
+  {
+    "id": "OP_MOVE",
+    "description": "Linear translation. Moves the weapon from start offset to end offset.",
+    "params": {
+      "start": { "x": "float (0 is center)", "y": "float" },
+      "end": { "x": "float", "y": "float" },
+      "curve": "string. Choose from: 'Linear' (smooth 0->1), 'PingPong' (0->1->0, best for stabbing/thrusts), 'EaseOut' (Fast to slow, best for heavy smashes), 'Loop' (continuous)."
+    }
+  },
+  {
+    "id": "OP_ROTATE",
+    "description": "Angular rotation. Rotates the weapon from start angle to end angle.",
+    "params": {
+      "start": "float (degrees, e.g., -45.0)",
+      "end": "float (degrees, e.g., 45.0)",
+      "curve": "string. Choose from: 'Linear', 'PingPong' (best for swings/slashes that return), 'EaseOut', 'Loop' (best for spinning attacks)."
+    }
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "atomic_primitives": [
+    {
+      "id": "OP_MODIFY_HP",
+      "description": "Modify target's HP (positive for heal, negative for damage).",
+      "params": {
+        "value": "float (required)",
+        "tag": "string (neutral, fire, poison, holy)",
+        "is_percentage": "boolean (default: false)"
+      }
+    },
+    {
+      "id": "OP_TIMER",
+      "description": "Execute a sequence of actions repeatedly over time.",
+      "params": {
+        "duration": "float",
+        "interval": "float",
+        "actions": "array (nested sequence of primitives)"
+      }
+    }
+  ],
+  "predefined_payloads": [
+    "payload_fire_burn"
+  ]
+}

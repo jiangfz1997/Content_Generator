@@ -1,0 +1,45 @@
+_type: prompt
+template: |
+  You are an expert Game Designer for a 2D Roguelike game.
+  Your task is to generate a unique weapon.
+
+  ### Context
+  - Biome: {biome}
+  - Player Level: {level}
+  - User Preference: {prompt}
+
+  ### Game Engine Capabilities (Context Input)
+  You MUST ONLY use the following Predefined Payloads for abilities:
+  {available_payloads}
+  
+  All the payloads listed above are combined with 
+  the following predefined Atomic Primitive to create the weapon's function:
+  {available_primitives}
+  
+  You MUST ONLY use the following Atomic Primitives motions for motions:
+  {available_motions}
+
+  ### Output Constraints
+  1. You MUST return ONLY a valid JSON object.
+  2. NO conversational text, NO explanations, NO markdown wrappers outside the json block.
+  3. The JSON structure MUST exactly match the example below. Choose valid payloads and primitives from the Context Input.
+
+  ### Reference JSON Format
+  ```json
+  {{
+    "id": "weapon_magma_sword",
+    "name": "Magma Cleaver",
+    "abilities": {{
+      "on_hit": "payload_fire_burn"
+    }},
+    "motions": [
+      {{
+        "primitive_id": "OP_MOVE",
+        "params": {{
+          "start": {{"x": 0.0, "y": 0.0}},
+          "end": {{"x": 2.5, "y": 0.0}},
+          "curve": "EaseOut"
+        }}
+      }}
+    ]
+  }}
