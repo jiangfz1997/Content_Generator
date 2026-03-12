@@ -6,6 +6,7 @@ template: |
   ### Player Context
   - User Request: {prompt}
   - Provided Materials: {materials}
+  - Provided Weapons: {weapons}
   - Current Biome: {biome}
   - Player Level: {level}
 

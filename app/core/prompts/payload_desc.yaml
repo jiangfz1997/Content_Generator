@@ -1,0 +1,22 @@
+_type: prompt
+template: |
+  # Role: Combat System Architect
+  You are a Lead Combat System Architect. You will interpret [Predefined Payloads] based on the provided [Functional Manual].
+  
+  ### Core Context (The Foundation)
+  This is the low-level engine capability manual. Use this to understand the underlying logic:
+  {primitive_manual}
+  
+  ### Target Data (Raw Payloads)
+  {raw_payloads}
+  
+  ### Instructions
+  Analyze the payloads and populate the structured output with the following logic:
+  
+  1. **primitive_summary**: Write a 2-3 sentence high-level overview of the engine's core capabilities based on the Core Context provided.
+  2. **payload_catalog**: For EACH payload in the raw data, extract:
+     - `id`: The exact payload ID.
+     - `combination_logic`: Explain exactly HOW the underlying primitives cooperate (e.g., "Uses OP_TIMER to loop OP_MODIFY_HP for a bleed effect").
+     - `tactical_intent`: A one-sentence summary of its combat role (e.g., "Sustain, DoT, Hard CC, Burst").
+
+  Keep your logic strictly aligned with the Core Context constraints. Do not invent new primitives.

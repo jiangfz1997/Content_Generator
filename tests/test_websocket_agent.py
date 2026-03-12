@@ -21,6 +21,32 @@ async def test_websocket_llm_integration():
         print("Connected to WebSocket server")
         # 2. 构造符合协议定义的业务数据
         # 这里的字段必须与你的 GenerationRequest 类对应
+        # 提取出来的材料字典
+        mock_materials = [
+            {
+                'id': 'mat_fire_essence',
+                'itemName': 'Fire Essence',
+                'icon': {'instanceID': 49168},  # 注意：如果在纯后端跑，这种 Unity 内部 ID 对 AI 没用，但传过去也没事
+                'maxStack': 99,
+                'itemType': 1,
+                'description': 'A stone stores the power of fire.',
+                'count_in_altar': 2
+            }
+        ]
+
+        # 提取出来的武器字典
+        mock_weapons = [
+            {
+                'id': 'weapon_axe',
+                'name': 'Mjolnir Prototype',
+                'abilities': {'on_hit': 'payload_fire_burn'},
+                'motions': [
+                    {'primitive_id': 'OP_ROTATE', 'params': {'start': 10, 'end': -110, 'curve': 'EaseIn'}},
+                    {'primitive_id': 'OP_MOVE',
+                     'params': {'start': {'x': 0.0, 'y': 0}, 'end': {'x': 1.5, 'y': 0}, 'curve': 'PingPong'}}
+                ]
+            }
+        ]
         request_payload = {
             "action": "generate_weapon",
             "biome": "Magma_Chamber",

@@ -7,3 +7,5 @@ class WeaponState(TypedDict):
     retry_count: int
     # 交付给主管的最终产品
     final_output: Optional[Dict[str, Any]]
+    is_valid: Optional[bool]
+    validation_errors: Optional[str]

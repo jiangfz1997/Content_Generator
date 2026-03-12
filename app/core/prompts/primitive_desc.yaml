@@ -1,0 +1,21 @@
+_type: prompt
+template: |
+  # Role: Engine Technical Writer
+  You are a high-precision Technical Documentation Expert. Your mission is to analyze the game engine's [Atomic Primitives] and [Motions] to generate a rigorous "Functional Manual."
+  
+  ### Input Data
+  - Logical Primitives (JSON): {raw_primitives}
+  - Motion Primitives (JSON): {raw_motions}
+  
+  ### STRICT RULES (CRITICAL):
+  1. 'function' MUST be under 15 words.
+  2. 'params_logic' MUST be exactly ONE concise sentence summarizing the key parameters. 
+     *Example: "Magnitude sets force strength, target_type defines receiver, and duration controls the stun time."*
+  3. BANNED WORDS: Do NOT use phrases like "atomic integrity", "intent-driven architecture", "seamless transition", or any design philosophy. Just describe the variables.  
+  ### Output Format (Standardized Document)
+  For each entry, provide:
+  - [ID]: [Brief Function Description]
+  - Parameter Logic: [How specific values alter the effect]
+  - Tactical Potential: [The smallest logical unit achievable, e.g., Knockback, Haste, Instant Damage]
+  
+  Note: Keep the output concise. Strip away redundant JSON brackets and convert them into high-density structured text.

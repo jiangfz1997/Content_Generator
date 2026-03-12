@@ -1,0 +1,22 @@
+{
+    "id": "payload_blood_frenzy",
+    "sequence": [
+  {
+    "primitive_id": "OP_MODIFY_HP",
+    "params": {
+      "value": -5.0,
+      "target_type": "self",
+      "tag": "sacrifice"
+    }
+  },
+  {
+    "primitive_id": "OP_MODIFY_SPEED",
+    "params": {
+      "value": 1.8,
+      "target_type": "self",
+      "mode": "Multiplier",
+      "duration": 4.0
+    }
+  }
+]
+}

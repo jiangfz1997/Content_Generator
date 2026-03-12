@@ -1,0 +1,25 @@
+{
+  "id": "payload_fire_burn",
+  "sequence": [
+    { "primitive_id": "OP_MODIFY_HP", "params": { "value": -20.0, "tag": "physical" } },
+    {
+      "primitive_id": "OP_APPLY_FORCE",
+      "params": {
+        "magnitude": 15.0,
+        "direction_mode": "SourceToTarget",
+        "override_duration": 0.3,
+        "target_type": "target"
+      }
+    },
+    {
+      "primitive_id": "OP_MODIFY_SPEED",
+      "params": {
+        "mode": "Multiplier",
+        "value": 0.5,
+        "duration": 3.0,
+        "target_type": "target"
+      }
+    },
+    { "primitive_id": "OP_TIMER", "params": { "duration": 5.0, "interval": 1.0, "actions": [ { "primitive_id": "OP_MODIFY_HP", "params": { "value": -5.0, "tag": "fire", "target": "enemy" } } ] } }
+  ]
+}

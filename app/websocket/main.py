@@ -1,6 +1,8 @@
 import asyncio
 import json
 import websockets
+
+from app.services.engine_docs_manager import engine_docs_manager
 from handlers import handle_generation_request
 from dotenv import load_dotenv
 import os
@@ -48,6 +50,7 @@ async def connection_handler(websocket):
 async def main():
 
     port = 8080
+    init_task = asyncio.create_task(engine_docs_manager.get_markdown_manual())
     async with websockets.serve(connection_handler, "localhost", port):
         print(f"✅ WebSocket Server 运行在 ws://localhost:{port}")
         # 保持运行

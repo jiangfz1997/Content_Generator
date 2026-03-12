@@ -1,0 +1,22 @@
+{
+    "id": "payload_gravity_pull",
+    "sequence": [
+        {
+            "primitive_id": "OP_APPLY_FORCE",
+            "params": {
+            "magnitude": -15.0, 
+            "target_type": "target",
+            "direction_mode": "FromHitPoint",
+            "override_duration": 0.3
+            }
+        },
+        {
+            "primitive_id": "OP_MODIFY_SPEED",
+            "params": {
+            "value": 0.2,
+            "mode": "Multiplier",
+            "duration": 1.5
+            }
+        }
+    ]
+}
