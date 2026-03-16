@@ -1,0 +1,23 @@
+# Model assignments for each agent.
+# Valid values: model | mini_model | gpt_model
+#
+#   model      — full local Ollama model (qwen2.5-coder:14b)
+#   mini_model — same model, token-limited (faster, cheaper for reviewers)
+#   gpt_model  — online OpenAI-compatible model (set OPENAI_API_KEY in .env)
+
+designer:         model
+concept_reviewer: mini_model
+tech_auditor:     mini_model
+weapon_crafter:   model
+weapon_patcher:   model
+payload_factory:  model
+summarizer:       model
+
+## GOOGLE ONLINE MODELS
+#designer:         google_flash_model
+#concept_reviewer: mini_model
+#tech_auditor:     google_flash_model
+#weapon_crafter:   google_flash_model
+#weapon_patcher:   google_flash_model
+#payload_factory:  google_flash_model
+#summarizer:       model

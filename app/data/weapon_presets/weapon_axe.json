@@ -1,31 +1,33 @@
-
-  {
+{
   "id": "weapon_axe",
   "name": "Mjolnir Prototype",
-  "abilities": {
-    "on_hit": ["payload_fire_burn"]
-  },
   "stats": {
     "range": 1.5,
-    "duration": 5.5,
+    "duration": 0.4,
     "cooldown": 0.4
   },
   "motions": [
-  { 
-    "primitive_id": "OP_ROTATE",
-    "params": {
-      "start": 90,       
-      "end": -90,       
-      "curve": "EaseIn"  
+    {
+      "primitive_id": "OP_ROTATE",
+      "params": {
+        "start": 90,
+        "end": -90,
+        "curve": "EaseIn"
+      }
+    },
+    {
+      "primitive_id": "OP_MOVE",
+      "params": {
+        "start": { "x": 0.0, "y": 0.0 },
+        "end":   { "x": 0.5, "y": 0.0 },
+        "curve": "PingPong"
+      }
     }
+  ],
+  "abilities": {
+    "on_hit":    ["payload_strike", "payload_knockback"],
+    "on_attack": [],
+    "on_equip":  []
   },
-  { 
-    "primitive_id": "OP_MOVE",
-    "params": {
-      "start": {"x": 0.0, "y": 0.0},
-      "end": {"x": 0.5, "y": 0.0},   
-      "curve": "PingPong"             
-    }
-  }
-]
+  "icon": "weapon_axe.png"
 }

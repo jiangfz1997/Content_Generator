@@ -34,8 +34,9 @@
     }
   ],
   "abilities": {
-    "on_hit": ["payload_berserker_charge"],
-    "on_equip": []
+    "on_hit":    ["payload_dot_bleed", "payload_drain"],
+    "on_attack": [],
+    "on_equip":  []
   },
   "icon": "weapon_axe.png"
 }

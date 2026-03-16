@@ -1,0 +1,34 @@
+{
+  "id": "payload_berserker_charge",
+  "sequence": [
+    {
+      "primitive_id": "OP_MODIFY_HP",
+      "params": {
+        "value": 10,
+        "source": "absolute",
+        "category": "self_damage",
+        "tag": "sacrifice",
+        "target_type": "self"
+      }
+    },
+    {
+      "primitive_id": "OP_MODIFY_HP",
+      "params": {
+        "value": 2.5,
+        "source": "weapon_multiplier",
+        "category": "damage",
+        "tag": "physical",
+        "target_type": "target"
+      }
+    },
+    {
+      "primitive_id": "OP_APPLY_FORCE",
+      "params": {
+        "magnitude": 20.0,
+        "target_type": "target",
+        "direction_mode": "SourceToTarget",
+        "override_duration": 0.5
+      }
+    }
+  ]
+}

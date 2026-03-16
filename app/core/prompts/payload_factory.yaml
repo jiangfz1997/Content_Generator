@@ -1,0 +1,77 @@
+_type: prompt
+template: |
+  # Role: Payload Engineer
+  You are a Combat Systems Engineer. Your job is to design ONE new atomic payload for the game engine.
+
+  A payload is a flat sequence of logic primitives that defines exactly ONE combat effect.
+  It must be composable — weapons will combine multiple payloads to build complex mechanics.
+
+  ### Engine Primitives Reference
+  {engine_manual}
+
+  ### New Payload Request
+  - Payload ID: {payload_id}
+  - Effect Description: {payload_description}
+  - Primitive Hint: {primitive_hint}
+
+  ### STRICT RULES
+
+  **RULE 0 — params is NEVER null:**
+  Every primitive entry MUST have this exact shape:
+  ```
+  {{"primitive_id": "OP_APPLY_FORCE", "params": {{"magnitude": 12.0, "direction_mode": "FromHitPoint", "target_type": "target"}}}}
+  ```
+  NEVER output `"params": null`. NEVER put parameter fields (magnitude, value, duration…) at the same level as primitive_id.
+  ALL parameters go INSIDE the "params" object. This is a hard engine constraint.
+
+  1. ATOMIC: One payload = ONE effect. A "poisonous fireball" is TWO effects → TWO payloads (fire damage + poison DoT).
+     Do NOT bundle damage + DoT, damage + force, or any two distinct effects in a single payload.
+     The weapon layer composes multiple payloads — your job is only to build one atomic piece.
+
+  2. OP_MODIFY_HP params (ALL inside "params" object):
+     - value: ALWAYS a positive float literal (e.g. 1.0, 0.25). NEVER a string or variable.
+     - source: "weapon_multiplier" (scales with weapon damage) or "absolute" (flat number).
+     - category: "damage" | "heal" | "self_damage"
+     - target_type: "self" or "target" ONLY. Field name is "target_type", NOT "target".
+
+  3. OP_APPLY_FORCE params:
+     - magnitude: float (positive = push away, negative = pull toward)
+     - direction_mode: "HitNormal" | "SourceForward" | "FromHitPoint" | "SourceToTarget"
+     - target_type: "self" or "target"
+     - override_duration: float (seconds target AI is stunned, e.g. 0.25)
+
+  4. OP_MODIFY_SPEED params:
+     - value: float (multiplier: 0.5 = half speed, 2.0 = double)
+     - mode: "Multiplier" | "Set" | "Add"
+     - target_type: "self" or "target"
+     - duration: float (seconds, 0 = instant physics impulse)
+
+  5. OP_TIMER params:
+     - duration: float (total seconds)
+     - interval: float (seconds between ticks)
+     - actions: list of primitive objects. Each action MUST be fully specified with its own non-null params.
+       Example of a valid DOT timer:
+       {{
+         "primitive_id": "OP_TIMER",
+         "params": {{
+           "duration": 5.0,
+           "interval": 1.0,
+           "actions": [
+             {{
+               "primitive_id": "OP_MODIFY_HP",
+               "params": {{"value": 0.25, "source": "weapon_multiplier", "category": "damage", "tag": "poison", "target_type": "target"}}
+             }}
+           ]
+         }}
+       }}
+       NEVER write {{"primitive_id": "OP_MODIFY_HP", "params": null}} — params MUST contain the actual values.
+
+  6. OP_SPAWN_PROJECTILE params:
+     - projectile_id: string (must reference an existing entry in ProjectileDatabase)
+     - count: int (default 1)
+     - spread_angle: float (degrees, default 0)
+
+  7. Do NOT invent primitive IDs. Only use the 5 primitives listed above.
+
+  ### Output
+  Generate a valid payload JSON for the specified effect.

@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass, asdict
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 # === 对应 Unity 的 NetPacket (信封) ===
 @dataclass
@@ -20,6 +20,7 @@ class GenerationRequest:
     prompt: Optional[str] = None
     materials: Optional[list] = None
     weapons: Optional[list] = None
+    session_id: Optional[str] = None
 
     @staticmethod
     def from_json(json_str: str) -> 'GenerationRequest':
@@ -31,10 +32,12 @@ class GenerationRequest:
             prompt=data.get("prompt"),
             materials=data.get("materials", []),
             weapons=data.get("weapons", []),
+            session_id=data.get("session_id"),
         )
 
 # === 对应 Unity 的 WeaponGenerateEvent (发回的响应) ===
 @dataclass
 class WeaponGenerateEvent:
     timestamp: int
-    content: Dict[str, Any] # 这是一个复杂的嵌套字典 (JObject)
+    content: Dict[str, Any]          # 武器数据 (JObject)
+    new_payloads: Optional[List[Dict[str, Any]]] = None  # 本次新生成的 payload 定义列表，无则 null

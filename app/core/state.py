@@ -12,7 +12,7 @@ class GlobalState(TypedDict):
 
     retry_count: int
 
-    design_concept: str
+    design_concept: Optional[Dict[str, Any]]
 
     idea_score: Optional[int]
     is_idea_passed: Optional[bool]
@@ -24,3 +24,12 @@ class GlobalState(TypedDict):
     tech_feedback: Optional[str]
 
     generation_history: Optional[List[Dict[str, Any]]]
+
+    engine_manual: Optional[str]  # cached markdown manual, populated on first load
+
+    session_id: Optional[str]                          # passed in at invocation time
+    reference_weapons: Optional[List[Dict[str, Any]]]  # all weapon summaries (for ID uniqueness)
+    similar_weapons: Optional[List[Dict[str, Any]]]    # same-biome weapons sorted by level proximity
+    pending_payload_ids: Optional[List[str]]            # IDs of newly factory-generated payloads
+    generated_icon: Optional[str]                      # icon filename produced by artist_node
+    payload_valid: Optional[bool]                      # set by payload_validator_node (code, not LLM)

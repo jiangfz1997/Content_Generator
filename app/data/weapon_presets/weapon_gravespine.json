@@ -3,7 +3,7 @@
   "name": "Gravespine",
   "stats": {
     "range": 1.5,
-    "duration": 5.5,
+    "duration": 0.4,
     "cooldown": 0.4
   },
   "visual_stats": {
@@ -33,8 +33,9 @@
     }
   ],
   "abilities": {
-    "on_hit": ["payload_toxic"],
-    "on_equip": []
+    "on_hit":    ["payload_dot_poison", "payload_slow"],
+    "on_attack": [],
+    "on_equip":  []
   },
   "icon": "weapon_axe.png"
 }

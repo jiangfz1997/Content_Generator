@@ -1,0 +1,15 @@
+{
+  "id": "payload_knockback",
+  "description": "Blasts the target away from the point of impact.",
+  "sequence": [
+    {
+      "primitive_id": "OP_APPLY_FORCE",
+      "params": {
+        "magnitude": 18.0,
+        "target_type": "target",
+        "direction_mode": "FromHitPoint",
+        "override_duration": 0.35
+      }
+    }
+  ]
+}

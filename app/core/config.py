@@ -19,10 +19,14 @@ class Settings:
     # PRIMITIVES_PATH = DATA_DIR / "primitives.json"
     PAYLOADS_PATH = DATA_DIR / "payloads"
     # MOTION_PATH = DATA_DIR / "primitive_motions.json"
-    PRIMITIVES_PATH = DATA_DIR / "PrimitivesSchema.md"
-    MOTION_PATH = DATA_DIR / "MotionPrimitivesSchema.md"
+    PRIMITIVES_PATH = DATA_DIR /"unity_schema"/ "PrimitivesSchema.md"
+    MOTION_PATH = DATA_DIR /"unity_schema"/ "MotionPrimitivesSchema.md"
+    WEAPON_SCHEMA_PATH = DATA_DIR /"unity_schema"/ "WeaponSchema.md"
+    PROJECTILE_SCHEMA_PATH = DATA_DIR /"unity_schema"/ "ProjectileSchema.md"
     WEAPON_PRESET_PATH = DATA_DIR / "weapon_presets"
 
+
+    MODEL_CONFIG_PATH = CORE_DIR / "model_config.yaml"
 
     OLLAMA_BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
     MODEL_NAME = "qwen2.5-coder:14b"

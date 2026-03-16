@@ -1,0 +1,25 @@
+{
+  "id": "payload_dot_poison",
+  "description": "Poisons the target. Deals poison damage every second for 6 seconds (0.2x weapon damage per tick).",
+  "sequence": [
+    {
+      "primitive_id": "OP_TIMER",
+      "params": {
+        "duration": 6.0,
+        "interval": 1.0,
+        "actions": [
+          {
+            "primitive_id": "OP_MODIFY_HP",
+            "params": {
+              "value": 0.2,
+              "source": "weapon_multiplier",
+              "category": "damage",
+              "tag": "poison",
+              "target_type": "target"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

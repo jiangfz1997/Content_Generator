@@ -1,45 +1,29 @@
 {
-  "manual_analysis": "The Inferno Lance is designed to synergize with the Magma Chamber biome, where fire-based challenges are prevalent. The 'payload_fire_burn' is the most appropriate payload as it deals significant damage and slows the target, aligning with the high-intensity environment. The payload's logic of dealing physical damage, applying force to knock back, reducing speed, and continuously dealing fire damage is well-suited for this scenario.",
-  "stat_balance_reasoning": "For a Level 20 player in the Magma Chamber biome, the Inferno Lance needs to be powerful enough to handle the heat and combat challenges. The range is set to 4.0 to ensure it can reach enemies effectively, matching the range of Spears. The cooldown is set to Medium (~0.8) to balance between being responsive and not overwhelming the player with too many rapid attacks. The damage and speed values are scaled to be substantial, providing a good balance of offensive power and mobility.",
   "id": "weapon_inferno_lance",
   "name": "Inferno Lance",
   "stats": {
     "range": 4.0,
-    "duration": 0.0,
+    "duration": 0.5,
     "cooldown": 0.8
   },
   "visual_stats": {
     "world_length": 3.0,
-    "pivot": {
-      "x": 0.2,
-      "y": 0.5
-    }
+    "pivot": { "x": 0.2, "y": 0.5 }
   },
   "motions": [
     {
       "primitive_id": "OP_MOVE",
       "params": {
-        "start": {
-          "x": 0.0,
-          "y": 0.0,
-          "z": 0.0
-        },
-        "end": {
-          "x": 4.0,
-          "y": 0.0,
-          "z": 0.0
-        },
+        "start": { "x": 0.0, "y": 0.0, "z": 0.0 },
+        "end":   { "x": 4.0, "y": 0.0, "z": 0.0 },
         "curve": "Linear"
       }
     }
   ],
   "abilities": {
-    "on_hit": [
-      "payload_fire_burn"
-    ],
-    "on_equip": [
-      "payload_fire_burn"
-    ]
+    "on_hit":    ["payload_dot_fire"],
+    "on_attack": [],
+    "on_equip":  ["payload_haste"]
   },
-  "icon": "48026"
+  "icon": "weapon_axe.png"
 }

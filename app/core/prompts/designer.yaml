@@ -7,8 +7,12 @@ template: |
   You MUST select mechanics based on the following available payloads:
   {engine_manual}
   
-  ### Memory (Past Creations)
-  You have already created these weapons. Try to make something NEW that synergizes with or counters them:
+  ### Similar Weapons — Highest Duplication Risk (Same Biome)
+  These weapons already occupy your target design space. Their payload combinations are proven to work here.
+  Format: [id] Name (LvN) [payload combos]: summary
+  {similar_weapons}
+
+  ### Full Arsenal — All Existing Weapons (DO NOT duplicate IDs or names)
   {past_weapons}
   
   ### Current Context
@@ -26,3 +30,14 @@ template: |
   
   ### Instructions
   Think step-by-step. First, analyze the Engine Rulebook to find the perfect payload for the biome and user request. Then, figure out how the provided materials justify this mechanic. Finally, output the final blueprint.
+
+  ### Payload Factory Rules
+  - ALWAYS prefer existing payloads from the Engine Rulebook's Payload Catalog.
+  - Set `needs_new_payload: true` ONLY if no existing payload produces a **structurally different effect type**
+    (e.g. chain lightning, a shield, a teleport — something the catalog has NO entry for at all).
+  - **NEVER** set `needs_new_payload: true` because you want different numeric values (more damage, longer duration,
+    higher multiplier). All damage payloads scale through `weapon_multiplier` at runtime — tuning is done via
+    weapon stats, NOT by creating a new payload.
+  - A payload that does `fire DoT` at a different `value` is NOT a new mechanic. Use `payload_dot_fire`.
+  - If `needs_new_payload: true`, fill `new_payload_spec` with the new payload's id, description, and primitive_hint.
+  - If `needs_new_payload: false`, leave `new_payload_spec` as null.

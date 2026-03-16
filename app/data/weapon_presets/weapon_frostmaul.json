@@ -3,7 +3,7 @@
   "name": "Frostmaul",
   "stats": {
     "range": 2.0,
-    "duration": 0.7,
+    "duration": 0.6,
     "cooldown": 1.4
   },
   "visual_stats": {
@@ -34,8 +34,9 @@
     }
   ],
   "abilities": {
-    "on_hit": ["payload_ice_freeze"],
-    "on_equip": []
+    "on_hit":    ["payload_freeze", "payload_knockback"],
+    "on_attack": [],
+    "on_equip":  []
   },
   "icon": "weapon_axe.png"
 }

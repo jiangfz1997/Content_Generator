@@ -1,22 +1,29 @@
 _type: prompt
 template: |
   # Role: Combat System Architect
-  You are a Lead Combat System Architect. You will interpret [Predefined Payloads] based on the provided [Functional Manual].
-  
-  ### Core Context (The Foundation)
-  This is the low-level engine capability manual. Use this to understand the underlying logic:
-  {primitive_manual}
-  
-  ### Target Data (Raw Payloads)
-  {raw_payloads}
-  
-  ### Instructions
-  Analyze the payloads and populate the structured output with the following logic:
-  
-  1. **primitive_summary**: Write a 2-3 sentence high-level overview of the engine's core capabilities based on the Core Context provided.
-  2. **payload_catalog**: For EACH payload in the raw data, extract:
-     - `id`: The exact payload ID.
-     - `combination_logic`: Explain exactly HOW the underlying primitives cooperate (e.g., "Uses OP_TIMER to loop OP_MODIFY_HP for a bleed effect").
-     - `tactical_intent`: A one-sentence summary of its combat role (e.g., "Sustain, DoT, Hard CC, Burst").
+  You are a Lead Combat System Architect. Interpret each [Predefined Payload] using the [Primitive Manual] as your reference.
 
-  Keep your logic strictly aligned with the Core Context constraints. Do not invent new primitives.
+  ### Core Context — Primitive Manual
+  {primitive_manual}
+
+  ### Raw Payload Data
+  {raw_payloads}
+
+  ### OP_MODIFY_HP Interpretation Guide (CRITICAL — read before analysis)
+  The new OP_MODIFY_HP schema uses three fields you must understand to describe payloads correctly:
+  - `source: "weapon_multiplier"` → value is a COEFFICIENT of the weapon's scaled damage (e.g. 1.0 = 100% weapon damage, 0.25 = 25% per DOT tick). Damage scales with player level automatically.
+  - `source: "absolute"` → value is a FLAT amount, always the same regardless of level. Used for fixed costs (sacrifice) or fixed heals.
+  - `category: "damage"` → reduces target HP. `category: "heal"` → restores HP. `category: "self_damage"` → reduces own HP (capped at 1 HP minimum).
+  - `tag` names the element: physical, fire, ice, poison, bleed, magic, sacrifice, heal, lifesteal.
+
+  ### Instructions
+  For each payload in the raw data, populate the structured output:
+
+  1. **primitive_summary**: 2–3 sentences covering the engine's core capabilities: what primitives exist, how OP_MODIFY_HP scaling works, and what OP_SPAWN_PROJECTILE enables.
+
+  2. **payload_catalog**: For EACH payload:
+     - `id`: Exact payload ID.
+     - `combination_logic`: Explain HOW the primitives cooperate. For OP_MODIFY_HP, explicitly state whether source is weapon_multiplier or absolute, and the coefficient/value. Example: "OP_TIMER fires OP_MODIFY_HP (0.25× weapon damage, fire tag) every 1s for 5s."
+     - `tactical_intent`: One sentence on combat role (e.g. "Sustained fire DoT — stack with knockback for zone denial").
+
+  Strictly cover every payload. Do not invent primitives that are not in the Core Context.

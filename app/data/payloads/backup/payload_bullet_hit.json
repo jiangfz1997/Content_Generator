@@ -1,0 +1,15 @@
+{
+  "id": "payload_bullet_hit",
+  "sequence": [
+    {
+      "primitive_id": "OP_MODIFY_HP",
+      "params": {
+        "value": 1.0,
+        "source": "weapon_multiplier",
+        "category": "damage",
+        "tag": "physical",
+        "target_type": "target"
+      }
+    }
+  ]
+}

@@ -3,7 +3,7 @@
   "name": "Cinderbrand",
   "stats": {
     "range": 2.5,
-    "duration": 5.5,
+    "duration": 0.5,
     "cooldown": 0.8
   },
   "visual_stats": {
@@ -34,8 +34,9 @@
     }
   ],
   "abilities": {
-    "on_hit": ["payload_fire_burn"],
-    "on_equip": []
+    "on_hit":    ["payload_dot_fire"],
+    "on_attack": [],
+    "on_equip":  []
   },
   "icon": "weapon_axe.png"
 }

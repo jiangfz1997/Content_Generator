@@ -47,26 +47,75 @@ class WeaponMongoService:
             await collection.bulk_write(operations, ordered=False)
             print(f"✅ [Seeder] 已同步 {len(operations)} 把武器。")
 
-    async def save_generated_weapon(self, weapon_data: dict, session_id: str):
-        """
-        保存 AI 生成的武器，并绑定 session_id
-        """
+    async def save_generated_weapon(self, weapon_data: dict, session_id: str,
+                                    biome: str = None, level: int = None):
+        """保存 AI 生成的武器，并绑定 session_id 及 RAG 元数据"""
         try:
+            if not weapon_data:
+                print("⚠️ [Service] weapon_data is None/empty, skipping save")
+                return False
+            abilities = weapon_data.get("abilities") or {}
+            on_hit = abilities.get("on_hit") or []
+            on_attack = abilities.get("on_attack") or []
+            on_equip = abilities.get("on_equip") or []
+            primary_payload = (on_hit or on_attack or on_equip or [None])[0]
+
             doc = WeaponDocument(
                 id=weapon_data["id"],
                 session_id=session_id,
                 is_preset=False,
-                content=WeaponContent(**weapon_data)
+                content=WeaponContent(**weapon_data),
+                biome=biome,
+                level=level,
+                primary_payload=primary_payload,
+                summary=weapon_data.get("summary"),
             )
             await db.db[self.collection_name].replace_one(
                 {"id": doc.id, "session_id": session_id},
                 doc.to_mongo(),
                 upsert=True
             )
+            print(f"✅ [Service] 武器已存档: {doc.id}")
             return True
         except Exception as e:
             print(f"❌ [Service] 保存 AI 武器失败: {e}")
             return False
+
+    async def get_similar_weapons(self, biome: str, level: int, limit: int = 6) -> List[dict]:
+        """
+        按 biome 筛选，按 level 距离排序，返回最相近的武器。
+        包含完整 abilities 信息，用于 designer 判断 payload 组合是否重复。
+        """
+        projection = {
+            "_id": 0, "id": 1, "biome": 1, "level": 1, "summary": 1,
+            "content.name": 1, "content.abilities": 1,
+        }
+        cursor = db.db[self.collection_name].find({"biome": biome}, projection)
+        docs = await cursor.to_list(length=200)
+
+        # Python 侧按 level 距离排序（DB 数量小，不值得 aggregation）
+        docs.sort(key=lambda d: abs((d.get("level") or 0) - level))
+
+        result = []
+        for d in docs[:limit]:
+            content = d.pop("content", {})
+            d["name"] = content.get("name", d.get("id"))
+            d["abilities"] = content.get("abilities", {})
+            result.append(d)
+        return result
+
+    async def get_all_summaries(self) -> List[dict]:
+        """拉取所有武器的轻量摘要，用于 RAG 注入 designer prompt"""
+        projection = {
+            "_id": 0, "id": 1, "biome": 1, "level": 1,
+            "primary_payload": 1, "summary": 1, "content.name": 1,
+        }
+        cursor = db.db[self.collection_name].find({}, projection)
+        docs = await cursor.to_list(length=500)
+        # 把 content.name 提升到顶层，方便格式化
+        for d in docs:
+            d["name"] = d.pop("content", {}).get("name", d.get("id"))
+        return docs
 
     async def get_weapons_for_game(self, session_id: str) -> List[dict]:
         """

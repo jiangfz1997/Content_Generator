@@ -17,5 +17,11 @@ class WeaponDocument(BaseModel):
     content: WeaponContent
     last_synced: datetime = Field(default_factory=datetime.utcnow)
 
+    # RAG metadata — top-level for cheap projection queries
+    biome: Optional[str] = None
+    level: Optional[int] = None
+    primary_payload: Optional[str] = None
+    summary: Optional[str] = None
+
     def to_mongo(self):
         return self.model_dump(exclude_none=True)

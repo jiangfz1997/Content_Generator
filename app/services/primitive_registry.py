@@ -11,6 +11,8 @@ class PrimitiveRegistry:
         self.primitive_path = settings.PRIMITIVES_PATH
         self.payloads_dir = settings.PAYLOADS_PATH
         self.primitive_motion_path = settings.MOTION_PATH
+        self.weapon_schema_path = settings.WEAPON_SCHEMA_PATH
+        self.projectile_schema_path = settings.PROJECTILE_SCHEMA_PATH
         self._cache = {}
 
 
@@ -31,6 +33,21 @@ class PrimitiveRegistry:
         except Exception as e:
             print(f"❌ Load Motion Schema failed: {e}")
             return "No motion schema found."
+    def get_weapon_schema(self) -> str:
+        try:
+            with open(Path(self.weapon_schema_path), "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception as e:
+            print(f"❌ Load Weapon Schema failed: {e}")
+            return "No weapon schema found."
+    
+    def get_projectile_schema(self) -> str:
+        try:
+            with open(Path(self.projectile_schema_path), "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception as e:
+            print(f"❌ Load Projectile Schema failed: {e}")
+            return "No projectile schema found."
 
     def get_all_payloads(self) -> Dict[str, Any]:
         """

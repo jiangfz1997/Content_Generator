@@ -1,0 +1,44 @@
+{
+  "id": "payload_shadow_poison",
+  "description": "Unleashes a burst of shadow and poison, pulling the enemy towards the blade and causing them to take damage over time.",
+  "sequence": [
+    {
+      "primitive_id": "OP_APPLY_FORCE",
+      "params": {
+        "magnitude": -5.0,
+        "direction_mode": "FromHitPoint",
+        "target_type": "target",
+        "override_duration": 0.25
+      }
+    },
+    {
+      "primitive_id": "OP_MODIFY_HP",
+      "params": {
+        "value": 0.5,
+        "source": "weapon_multiplier",
+        "category": "damage",
+        "tag": "poison",
+        "target_type": "target"
+      }
+    },
+    {
+      "primitive_id": "OP_TIMER",
+      "params": {
+        "duration": 4.0,
+        "interval": 0.5,
+        "actions": [
+          {
+            "primitive_id": "OP_MODIFY_HP",
+            "params": {
+              "value": 0.1,
+              "source": "weapon_multiplier",
+              "category": "damage",
+              "tag": "poison",
+              "target_type": "target"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

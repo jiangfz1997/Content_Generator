@@ -2,37 +2,86 @@ from pydantic import BaseModel, Field
 from typing import Literal, Union
 from typing_extensions import Annotated
 
+from app.models.common_types import *
 
 
-class Vector3(BaseModel):
-    x: float = Field(default=0.0, description="X轴坐标/缩放")
-    y: float = Field(default=0.0, description="Y轴坐标/缩放")
-    z: float = Field(default=0.0, description="Z轴坐标/缩放（如果是 2D 位移通常为 0，缩放通常为 1）")
-
-# 提取公共的 Curve 枚举，防止手滑写错，也方便统一扩展
-CurveType = Literal["Linear", "EaseOut", "PingPong", "Loop"]
-
+class ArcParams(BaseModel):
+    radius: float = Field(
+        description="Orbit radius in world units from the weapon's pivot. "
+                    "E.g. 1.5 for a shortsword, 3.0 for a greatsword."
+    )
+    start_angle: float = Field(
+        description="Starting angle in degrees. 0=right, 90=up, 180=left, 270=down."
+    )
+    end_angle: float = Field(
+        description="Ending angle in degrees. Values outside [0,360] produce multi-revolution sweeps."
+    )
+    curve: CurveType = Field(
+        description="'EaseOut': impactful slam. 'EaseInOut': smooth sweep. 'EaseIn': wind-up swing."
+    )
+    time_start: float = Field(
+        default=0.0,
+        description="Normalized time [0,1] when this primitive begins within the attack duration."
+    )
+    time_end: float = Field(
+        default=1.0,
+        description="Normalized time [0,1] when this primitive ends within the attack duration."
+    )
 
 
 class MoveParams(BaseModel):
-    start: Vector3 = Field(description="基于武器轴心点的起始本地偏移量。")
-    end: Vector3 = Field(description="武器移动的终点本地偏移量。")
-    curve: CurveType = Field(description="插值曲线：'Linear', 'EaseOut'(挥砍), 'PingPong'(突刺), 'Loop'。")
+    start: Vector2 = Field(description="Starting local offset from pivot: {x, y}.")
+    end: Vector2 = Field(description="Target local offset the weapon moves toward: {x, y}.")
+    curve: CurveType = Field(
+        description="'EaseOut': fast-start slow-end (swings). 'PingPong': out-and-back (thrusts). "
+                    "'Overshoot': overshoots target then snaps back."
+    )
+    time_start: float = Field(
+        default=0.0,
+        description="Normalized time [0,1] when this primitive begins within the attack duration."
+    )
+    time_end: float = Field(
+        default=1.0,
+        description="Normalized time [0,1] when this primitive ends within the attack duration."
+    )
+
 
 class RotateParams(BaseModel):
-    start: float = Field(description="起始旋转角度 (Z轴，单位：度)。")
-    end: float = Field(description="结束旋转角度 (Z轴，单位：度)。")
-    curve: CurveType = Field(description="插值曲线：'Linear', 'EaseOut'(打击感重砍), 'PingPong', 'Loop'。")
+    start: float = Field(description="Starting rotation angle in degrees (Z-axis).")
+    end: float = Field(description="Ending rotation angle in degrees (Z-axis).")
+    curve: CurveType = Field(
+        description="'EaseOut': impactful slashes. 'EaseIn': wind-up. 'Overshoot': snappy bounce."
+    )
+    time_start: float = Field(
+        default=0.0,
+        description="Normalized time [0,1] when this primitive begins within the attack duration."
+    )
+    time_end: float = Field(
+        default=1.0,
+        description="Normalized time [0,1] when this primitive ends within the attack duration."
+    )
+
 
 class ScaleParams(BaseModel):
     start: Vector3 = Field(
         default_factory=lambda: Vector3(x=1.0, y=1.0, z=1.0),
-        description="武器的起始缩放比例。默认为 {1, 1, 1}。"
+        description="Starting scale: {x, y, z}. Defaults to {1, 1, 1}."
     )
-    end: Vector3 = Field(description="动作持续时间结束时的目标缩放比例。")
-    curve: CurveType = Field(description="决定缩放如何过渡的插值曲线。")
+    end: Vector3 = Field(description="Target scale at end of motion: {x, y, z}.")
+    curve: CurveType = Field(description="Interpolation curve for the scale transition.")
+    time_start: float = Field(
+        default=0.0,
+        description="Normalized time [0,1] when this primitive begins within the attack duration."
+    )
+    time_end: float = Field(
+        default=1.0,
+        description="Normalized time [0,1] when this primitive ends within the attack duration."
+    )
 
 
+class PrimitiveArc(BaseModel):
+    primitive_id: Literal["OP_ARC"]
+    params: ArcParams
 
 class PrimitiveMove(BaseModel):
     primitive_id: Literal["OP_MOVE"]
@@ -49,9 +98,10 @@ class PrimitiveScale(BaseModel):
 
 AnyMotionPrimitive = Annotated[
     Union[
+        PrimitiveArc,
         PrimitiveMove,
         PrimitiveRotate,
-        PrimitiveScale
+        PrimitiveScale,
     ],
     Field(discriminator="primitive_id")
 ]

@@ -1,0 +1,52 @@
+{
+  "id": "payload_poison_burst",
+  "sequence": [
+    {
+      "primitive_id": "OP_MODIFY_HP",
+      "params": {
+        "value": 1.0,
+        "source": "weapon_multiplier",
+        "category": "damage",
+        "tag": "physical",
+        "target_type": "target"
+      }
+    },
+    {
+      "primitive_id": "OP_APPLY_FORCE",
+      "params": {
+        "magnitude": 6.0,
+        "target_type": "target",
+        "direction_mode": "SourceToTarget",
+        "override_duration": 0.2
+      }
+    },
+    {
+      "primitive_id": "OP_MODIFY_SPEED",
+      "params": {
+        "value": 0.65,
+        "target_type": "target",
+        "mode": "Multiplier",
+        "duration": 4.0
+      }
+    },
+    {
+      "primitive_id": "OP_TIMER",
+      "params": {
+        "duration": 4.0,
+        "interval": 1.0,
+        "actions": [
+          {
+            "primitive_id": "OP_MODIFY_HP",
+            "params": {
+              "value": 0.25,
+              "source": "weapon_multiplier",
+              "category": "damage",
+              "tag": "poison",
+              "target_type": "target"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

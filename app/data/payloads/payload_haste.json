@@ -1,0 +1,15 @@
+{
+  "id": "payload_haste",
+  "description": "Grants the wielder a burst of speed (2x) for 3 seconds. Useful as on_equip passive or on_hit self-buff.",
+  "sequence": [
+    {
+      "primitive_id": "OP_MODIFY_SPEED",
+      "params": {
+        "value": 2.0,
+        "target_type": "self",
+        "mode": "Multiplier",
+        "duration": 3.0
+      }
+    }
+  ]
+}

@@ -1,95 +1,166 @@
-# tests/integration/test_websocket_agent.py
-import pytest
+"""
+WebSocket integration test — requires the server to be running.
+
+Start server first:
+    python app/websocket/main.py
+
+Then run:
+    pytest tests/test_websocket_agent.py -v -s
+"""
 import json
 import asyncio
+import pytest
 import websockets
 
 
-@pytest.mark.asyncio
-async def test_websocket_llm_integration():
-    """
-    集成测试目标：
-    1. 验证 WebSocket 握手是否成功。
-    2. 发送 GenerationRequest 协议包。
-    3. 验证逻辑是否穿透到 LangGraph/LLM 并成功返回 WeaponGenerateEvent。
-    """
-    # 你的服务器地址，确保 main.py 已经启动
-    uri = "ws://localhost:8080"
-    print("Trying to connect to WebSocket server at:", uri)
-    # 1. 建立连接
-    async with websockets.connect(uri) as websocket:
-        print("Connected to WebSocket server")
-        # 2. 构造符合协议定义的业务数据
-        # 这里的字段必须与你的 GenerationRequest 类对应
-        # 提取出来的材料字典
-        mock_materials = [
+SERVER_URI = "ws://localhost:8080"
+LLM_TIMEOUT = 240.0   # local 14B model can be slow; raise if needed
+
+
+# ---------------------------------------------------------------------------
+# Shared packet builder
+# ---------------------------------------------------------------------------
+
+def _make_packet(biome: str = "Magma_Chamber", level: int = 5,
+                 prompt: str = "Create a fire-themed weapon",
+                 materials: list = None, weapons: list = None) -> str:
+    if materials is None:
+        materials = [
             {
-                'id': 'mat_fire_essence',
-                'itemName': 'Fire Essence',
-                'icon': {'instanceID': 49168},  # 注意：如果在纯后端跑，这种 Unity 内部 ID 对 AI 没用，但传过去也没事
-                'maxStack': 99,
-                'itemType': 1,
-                'description': 'A stone stores the power of fire.',
-                'count_in_altar': 2
+                "id": "mat_fire_essence",
+                "itemName": "Fire Essence",
+                "itemType": 1,
+                "description": "A crystallised stone that stores the power of fire.",
+                "count_in_altar": 2,
+            },
+            {
+                "id": "mat_obsidian_shard",
+                "itemName": "Obsidian Shard",
+                "itemType": 1,
+                "description": "A razor-sharp volcanic glass fragment.",
+                "count_in_altar": 1,
+            },
+        ]
+    if weapons is None:
+        weapons = [
+            {
+                "id": "weapon_starter_blade",
+                "name": "Starter Blade",
+                "abilities": {"on_hit": ["payload_strike"], "on_attack": [], "on_equip": []},
+                "motions": [
+                    {"primitive_id": "OP_ROTATE",
+                     "params": {"start": 30, "end": -90, "curve": "EaseIn",
+                                "time_start": 0.0, "time_end": 1.0}},
+                ],
             }
         ]
 
-        # 提取出来的武器字典
-        mock_weapons = [
-            {
-                'id': 'weapon_axe',
-                'name': 'Mjolnir Prototype',
-                'abilities': {'on_hit': 'payload_fire_burn'},
-                'motions': [
-                    {'primitive_id': 'OP_ROTATE', 'params': {'start': 10, 'end': -110, 'curve': 'EaseIn'}},
-                    {'primitive_id': 'OP_MOVE',
-                     'params': {'start': {'x': 0.0, 'y': 0}, 'end': {'x': 1.5, 'y': 0}, 'curve': 'PingPong'}}
-                ]
-            }
-        ]
-        request_payload = {
+    packet = {
+        "msgType": "GenerationRequest",
+        "payload": {
             "action": "generate_weapon",
-            "biome": "Magma_Chamber",
-            "player_level": 20,
-            "prompt": "use the itmes listed in materials to generate a unique weapon suitable for a level 20 player in the Magma Chamber biome.",
-            "materials": ["Fire Essence", "Lava Core", "Obsidian Shard"]
-        }
+            "biome": biome,
+            "player_level": level,
+            "prompt": prompt,
+            "materials": materials,
+            "weapons": weapons,
+            "session_id": "test_session_ws_001",
+        },
+    }
+    return json.dumps(packet, ensure_ascii=False)
 
-        # 3. 封装进 NetPacket 信封
-        # msgType 必须对应你在服务器端 ROUTER 里的 Key 或 C# 类名
-        packet = {
-            "msgType": "GenerationRequest",
-            "payload": request_payload
-        }
 
-        print(f"\n[Test] 正在发送请求: {packet['msgType']}")
-        await websocket.send(json.dumps(packet))
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
 
-        # 4. 接收响应
-        # 注意：由于 14B 模型本地推理需要时间，设置 30-60 秒的超时是合理的
-        try:
-            raw_response = await asyncio.wait_for(websocket.recv(), timeout=180.0)
-            response_data = json.loads(raw_response)
+@pytest.mark.asyncio
+async def test_websocket_generate_weapon():
+    """
+    Full integration test:
+      1. Connect to the WebSocket server.
+      2. Send a GenerationRequest packet.
+      3. Receive WeaponGenerateEvent and validate the weapon schema.
+    """
+    print(f"\n🔌 [Test] Connecting to {SERVER_URI}...")
+    try:
+        async with websockets.connect(SERVER_URI) as ws:
+            print("✅ Connected")
 
-            # --- 5. 验证环节 ---
+            packet_str = _make_packet(
+                biome="Magma_Chamber",
+                level=5,
+                prompt="A volcanic weapon that burns enemies over time",
+            )
+            print(f"📤 Sending GenerationRequest...")
+            await ws.send(packet_str)
 
-            # 验证外层信封
-            assert response_data["msgType"] == "WeaponGenerateEvent", "返回的消息类型不正确"
+            print(f"⏳ Waiting for response (timeout={LLM_TIMEOUT}s)...")
+            try:
+                raw = await asyncio.wait_for(ws.recv(), timeout=LLM_TIMEOUT)
+            except asyncio.TimeoutError:
+                pytest.fail(f"❌ LLM response timed out after {LLM_TIMEOUT}s")
 
-            # 验证内层 payload
-            payload = response_data["payload"]
-            assert "content" in payload, "响应中缺少 content 字段"
+            data = json.loads(raw)
 
-            # 验证 AI 生成的具体内容
+            # --- Envelope ---
+            assert data.get("msgType") == "WeaponGenerateEvent", \
+                f"Unexpected msgType: {data.get('msgType')!r}. Full response: {data}"
+
+            payload = data.get("payload", {})
+            assert "content" in payload, f"Missing 'content' in payload: {payload}"
+
             weapon = payload["content"]
-            assert "name" in weapon, "AI 未生成武器名称"
-            assert "damage" in weapon, "AI 未生成武器伤害"
 
-            print(f"\n[Test] 集成测试成功！")
-            print(f"生成的武器: {weapon['name']} (伤害: {weapon['damage']})")
-            print(f"AI 描述: {weapon.get('description', '无')}")
+            # --- Required fields ---
+            for field in ("id", "name", "stats", "motions", "abilities", "icon"):
+                assert field in weapon, f"Missing field in weapon: '{field}'"
 
-        except asyncio.TimeoutError:
-            pytest.fail("❌ 测试失败：LLM 响应超时，请检查 Ollama 是否卡死或显存已满。")
-        except ConnectionRefusedError:
-            pytest.fail("❌ 测试失败：无法连接服务器，请确保 main.py 正在运行。")
+            stats = weapon["stats"]
+            for stat in ("base_damage", "design_level", "cooldown", "range",
+                         "duration", "hit_start", "hit_end"):
+                assert stat in stats, f"Missing stat: '{stat}'"
+
+            abilities = weapon["abilities"]
+            assert isinstance(abilities.get("on_hit", []), list),    "on_hit must be list"
+            assert isinstance(abilities.get("on_attack", []), list), "on_attack must be list"
+            assert isinstance(abilities.get("on_equip", []), list),  "on_equip must be list"
+
+            assert len(weapon["motions"]) >= 1, "Weapon must have at least one motion"
+
+            # --- Print summary ---
+            print(f"\n🎉 Weapon generated successfully!")
+            print(f"   Name     : {weapon['name']}")
+            print(f"   ID       : {weapon['id']}")
+            print(f"   Biome    : Magma_Chamber  Level: {stats['design_level']}")
+            print(f"   Damage   : {stats['base_damage']}  Cooldown: {stats['cooldown']}s")
+            print(f"   on_hit   : {abilities.get('on_hit')}")
+            print(f"   on_attack: {abilities.get('on_attack')}")
+            print(f"   on_equip : {abilities.get('on_equip')}")
+            print(f"   Icon     : {weapon['icon']}")
+            if weapon.get("summary"):
+                print(f"   Summary  : {weapon['summary']}")
+            print(f"\n   Full JSON:\n{json.dumps(weapon, indent=2, ensure_ascii=False)}")
+
+    except ConnectionRefusedError:
+        pytest.fail(f"❌ Cannot connect to {SERVER_URI}. Is the server running?\n"
+                    "   Start it with: python app/websocket/main.py")
+
+
+@pytest.mark.asyncio
+async def test_websocket_ping():
+    """Minimal connectivity check — does not invoke the LLM."""
+    print(f"\n🔌 [Test] Ping test to {SERVER_URI}...")
+    try:
+        async with websockets.connect(SERVER_URI) as ws:
+            ping_packet = json.dumps({"msgType": "ping", "payload": {}})
+            await ws.send(ping_packet)
+            raw = await asyncio.wait_for(ws.recv(), timeout=5.0)
+            data = json.loads(raw)
+            print(f"   Pong response: {data}")
+            # Server should respond — exact msgType varies, just check it's valid JSON
+            assert isinstance(data, dict), "Response is not a JSON object"
+    except ConnectionRefusedError:
+        pytest.fail(f"❌ Cannot connect to {SERVER_URI}. Is the server running?")
+    except asyncio.TimeoutError:
+        pytest.fail("❌ Ping timed out — server is not responding")

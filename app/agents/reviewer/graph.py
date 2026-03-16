@@ -7,6 +7,7 @@ from app.services.llm_service import llm_service
 
 # 🌟 引入新的极简文档管理器和控制台回调
 from app.services.engine_docs_manager import engine_docs_manager
+from app.services.mongo_service.weapon_services import weapon_mongo_service
 from app.utils.callbacks import AgentConsoleCallback
 
 
@@ -42,11 +43,9 @@ class ReviewerAgent:
         self.idea_prompt = load_prompt(str(idea_prompt_path), encoding=settings.ENCODING)
         self.tech_prompt = load_prompt(str(tech_prompt_path), encoding=settings.ENCODING)
 
-        # 2. 绑定两套不同的结构化输出 (建议用 mini 模型降本增效)
-        self.idea_llm = llm_service.mini_model.with_structured_output(IdeaReviewResult)
-        self.tech_llm = llm_service.mini_model.with_structured_output(TechAuditResult)
-        # self.idea_llm = llm_service.gpt_model.with_structured_output(IdeaReviewResult)
-        # self.tech_llm = llm_service.gpt_model.with_structured_output(TechAuditResult)
+        # 2. 绑定两套不同的结构化输出
+        self.idea_llm = llm_service.get_model("concept_reviewer").with_structured_output(IdeaReviewResult)
+        self.tech_llm = llm_service.get_model("tech_auditor").with_structured_output(TechAuditResult)
 
         # 3. 组装两条独立的 Chain
         self.idea_chain = self.idea_prompt | self.idea_llm
@@ -89,9 +88,12 @@ class ReviewerAgent:
         elif attempts >= 2:
             strictness = "LAX (Only fail on critical logic errors)"
 
-        engine_manual_md = await engine_docs_manager.get_markdown_manual()
+        if state.get("engine_manual"):
+            engine_manual_md = state["engine_manual"]
+        else:
+            engine_manual_md = await engine_docs_manager.get_audit_manual()
 
-        final_weapon_data = state.get("final_output", {})
+        final_weapon_data = state.get("final_output") or {}
         weapon_json_str = json.dumps(final_weapon_data, ensure_ascii=False) if final_weapon_data else "{}"
         print("\n[TechAuditor] 正在对照引擎底层手册进行最终校验...")
 
@@ -109,12 +111,18 @@ class ReviewerAgent:
         print(f"{color}[Tech Audit] Passed: {result.is_final_passed} | Feedback: {result.tech_feedback}\033[0m")
 
         if result.is_final_passed:
-            state.setdefault("generation_history", []).append({
-                "weapon_id": final_weapon_data.get("id"),
-            })
-        return {"is_final_passed": result.is_final_passed,
-                "tech_feedback": result.tech_feedback,
-                "audit_attempts": attempts + 1,
-                }
+            session_id = state.get("session_id", "unknown_session")
+            await weapon_mongo_service.save_generated_weapon(
+                weapon_data=final_weapon_data,
+                session_id=session_id,
+                biome=state.get("biome"),
+                level=state.get("level"),
+            )
+
+        return {
+            "is_final_passed": result.is_final_passed,
+            "tech_feedback": result.tech_feedback,
+            "audit_attempts": attempts + 1,
+        }
 
 reviewer_agent = ReviewerAgent()

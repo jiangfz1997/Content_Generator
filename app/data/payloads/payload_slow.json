@@ -1,0 +1,15 @@
+{
+  "id": "payload_slow",
+  "description": "Reduces the target's movement speed to 50% for 3 seconds.",
+  "sequence": [
+    {
+      "primitive_id": "OP_MODIFY_SPEED",
+      "params": {
+        "value": 0.5,
+        "target_type": "target",
+        "mode": "Multiplier",
+        "duration": 3.0
+      }
+    }
+  ]
+}

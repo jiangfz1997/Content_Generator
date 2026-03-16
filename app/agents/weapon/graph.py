@@ -1,11 +1,12 @@
-from langchain_core.prompts import load_prompt
+import json
+from langchain_core.prompts import load_prompt, ChatPromptTemplate
 
 from app.core.global_prompts import GLOBAL_DESIGN_CONSTITUTION
 from app.core.state import GlobalState
 from app.services.engine_docs_manager import engine_docs_manager
 from app.services.llm_service import llm_service
 from app.core.config import settings
-from app.models.schemas import WeaponSchema
+from app.models.schemas import WeaponSchema, WeaponPatchSchema, apply_weapon_patch
 from app.utils.callbacks import AgentConsoleCallback
 from app.utils.inject_prompts import inject_prompts
 
@@ -19,12 +20,37 @@ class WeaponAgent:
         self.prompt = load_prompt(str(prompt_path), encoding=settings.ENCODING)
 
 
-        self.structured_llm = llm_service.model.with_structured_output(WeaponSchema)
+        self.structured_llm = llm_service.get_model("weapon_crafter").with_structured_output(WeaponSchema)
         inject_prompts(GLOBAL_DESIGN_CONSTITUTION, self.prompt)
         self.chain = self.prompt | self.structured_llm
         self.fresh_payloads = None
         self.fresh_primitives = None
         self.fresh_motions = None
+
+        # Surgical patch chain: only fixes fields flagged by the auditor
+        _patch_prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a Technical Weapon Surgeon. Your ONLY job is to fix the EXACT issues listed in the auditor's feedback.
+
+Engine Manual (reference for valid payload/motion IDs):
+{engine_manual}
+
+CRITICAL RULES:
+- ONLY modify the fields explicitly mentioned in the feedback.
+- Keep ALL other fields byte-for-byte identical to the original.
+- Do NOT rename, redesign, or restructure anything not mentioned.
+- Payload IDs MUST exist in the Engine Manual above.
+"""),
+            ("human", """Current Weapon JSON:
+{current_weapon}
+
+Auditor Feedback (fix ONLY these issues):
+{feedback}
+
+Biome: {biome} | Level: {level}
+
+Output ONLY the fields that need to change."""),
+        ])
+        self.patch_chain = _patch_prompt | llm_service.get_model("weapon_patcher").with_structured_output(WeaponPatchSchema)
 
 
 
@@ -41,10 +67,18 @@ class WeaponAgent:
         #     available_primitives=self.fresh_primitives,
         #     available_motions=self.fresh_motions,
         # )
-        engine_manual_md = await engine_docs_manager.get_markdown_manual()
+        if state.get("engine_manual"):
+            engine_manual_md = state["engine_manual"]
+        else:
+            engine_manual_md = await engine_docs_manager.get_markdown_manual()
+            state["engine_manual"] = engine_manual_md
 
-        history = state.get("generation_history", [])
+        history = state.get("generation_history", [])[-20:]
         history_str = "\n".join([f"- {w['weapon_id']}" for w in history]) if history else "No weapons created yet."
+
+        concept = state.get("design_concept") or {}
+        keywords = concept.get("keywords", [])
+        keywords_str = ", ".join(keywords) if keywords else "none specified"
 
         try:
             weapon_obj: WeaponSchema = await self.chain.ainvoke({
@@ -52,7 +86,8 @@ class WeaponAgent:
                 "level": state["level"],
                 "materials": state["materials"],
                 "weapons": state["weapons"],
-                "concept": state.get("design_concept", ""),
+                "concept": concept,
+                "keywords": keywords_str,
                 "feedback": state.get("tech_feedback", "None"),
                 "engine_manual": engine_manual_md,
                 "past_weapons": history_str
@@ -60,7 +95,7 @@ class WeaponAgent:
                 config={"callbacks": [AgentConsoleCallback(agent_name="WeaponAgent")]})
 
 
-            return {"final_output": weapon_obj.model_dump(), "generation_history": state["generation_history"]}
+            return {"final_output": weapon_obj.model_dump(), "generation_history": state.get("generation_history", [])}
         except Exception as e:
             err_msg = f"[Crafting Node] {e}"
             print(err_msg)
@@ -69,10 +104,34 @@ class WeaponAgent:
                 "is_valid": False,
                 "validation_errors": err_msg
             }
-    """
-    TODO: try to have a new method, instead of let weapon_crafter regenerate everything,
-     only let it correct the attributes with issues to save token and accelerate the pipeline
-    """
+    async def patch_node(self, state: GlobalState):
+        """Surgical patch: fix only the fields flagged by tech_auditor feedback."""
+        original_weapon = state.get("final_output", {})
+        feedback = state.get("tech_feedback", "")
+        print(f"[PatchNode] 外科手术修复，问题: {feedback[:80]}...")
+
+        if state.get("engine_manual"):
+            engine_manual_md = state["engine_manual"]
+        else:
+            engine_manual_md = await engine_docs_manager.get_markdown_manual()
+
+        try:
+            patch_result: WeaponPatchSchema = await self.patch_chain.ainvoke(
+                {
+                    "current_weapon": json.dumps(original_weapon, ensure_ascii=False),
+                    "feedback": feedback,
+                    "engine_manual": engine_manual_md,
+                    "biome": state.get("biome", "Unknown"),
+                    "level": state.get("level", 1),
+                },
+                config={"callbacks": [AgentConsoleCallback(agent_name="WeaponPatcher")]},
+            )
+            patched_weapon = apply_weapon_patch(original_weapon, patch_result)
+            print(f"[PatchNode] 修复完成: {patch_result.patch_analysis}")
+            return {"final_output": patched_weapon}
+        except Exception as e:
+            print(f"[PatchNode] 修复失败，保留原始数据: {e}")
+            return {"final_output": original_weapon}
 
 
     # async def perform_surgical_patch(self, original_weapon: dict, audit_feedback: str) -> dict:

@@ -1,0 +1,43 @@
+{
+  "id": "payload_lightning_strike",
+  "sequence": [
+    {
+      "primitive_id": "OP_MODIFY_HP",
+      "params": {
+        "value": 1.0,
+        "source": "weapon_multiplier",
+        "category": "damage",
+        "tag": "lightning",
+        "target_type": "target"
+      }
+    },
+    {
+      "primitive_id": "OP_APPLY_FORCE",
+      "params": {
+        "magnitude": 10.0,
+        "target_type": "target",
+        "direction_mode": "SourceToTarget",
+        "override_duration": 0.8
+      }
+    },
+    {
+      "primitive_id": "OP_TIMER",
+      "params": {
+        "duration": 3.0,
+        "interval": 1.0,
+        "actions": [
+          {
+            "primitive_id": "OP_MODIFY_HP",
+            "params": {
+              "value": 0.3,
+              "source": "weapon_multiplier",
+              "category": "damage",
+              "tag": "lightning",
+              "target_type": "target"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

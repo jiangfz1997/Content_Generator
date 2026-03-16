@@ -38,20 +38,21 @@ class FinalEngineManual(BaseModel):
 class SummarizerAgent:
     def __init__(self):
         # 1. 准备两套 Prompt
-        self.primitive_prompt = load_prompt(settings.PROMPTS_DIR / "primitive_desc.yaml")
-        self.payload_prompt = load_prompt(settings.PROMPTS_DIR / "payload_desc.yaml")
+        self.primitive_prompt = load_prompt(str(settings.PROMPTS_DIR / "primitive_desc.yaml"), encoding=settings.ENCODING)
+        self.payload_prompt = load_prompt(str(settings.PROMPTS_DIR / "payload_desc.yaml"), encoding=settings.ENCODING)
         inject_prompts(GLOBAL_DESIGN_CONSTITUTION, self.primitive_prompt)
         inject_prompts(GLOBAL_DESIGN_CONSTITUTION, self.payload_prompt)
 
         # 2. 定义两套 LLM 链
-        self.primitive_chain = self.primitive_prompt | llm_service.model.with_structured_output(PrimitiveManual)
-        self.payload_chain = self.payload_prompt | llm_service.model.with_structured_output(FinalEngineManual)
+        _summarizer_model = llm_service.get_model("summarizer")
+        self.primitive_chain = self.primitive_prompt | _summarizer_model.with_structured_output(PrimitiveManual)
+        self.payload_chain = self.payload_prompt | _summarizer_model.with_structured_output(FinalEngineManual)
 
     async def summarize_engine(self) -> tuple[FinalEngineManual, str]:
         # --- 第一步：解析 Primitives ---
         raw_primitives_md = primitive_registry.get_primitives_schema()
         raw_motions_md = primitive_registry.get_motions_schema()
-
+        
         # 也可以包含 motions 以便完整理解
         print("[Summarizer] Analyzing Primitive and Motion Schemas...")
         primitive_manual: PrimitiveManual = await self.primitive_chain.ainvoke({

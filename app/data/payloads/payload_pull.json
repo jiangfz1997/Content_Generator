@@ -1,0 +1,15 @@
+{
+  "id": "payload_pull",
+  "description": "Yanks the target toward the caster using negative force magnitude.",
+  "sequence": [
+    {
+      "primitive_id": "OP_APPLY_FORCE",
+      "params": {
+        "magnitude": -15.0,
+        "target_type": "target",
+        "direction_mode": "FromHitPoint",
+        "override_duration": 0.3
+      }
+    }
+  ]
+}

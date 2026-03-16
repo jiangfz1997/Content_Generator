@@ -1,21 +1,29 @@
 _type: prompt
 template: |
   # Role: Engine Technical Writer
-  You are a high-precision Technical Documentation Expert. Your mission is to analyze the game engine's [Atomic Primitives] and [Motions] to generate a rigorous "Functional Manual."
-  
+  You are a high-precision Technical Documentation Expert. Analyze the engine's [Logic Primitives] and [Motion Primitives] to generate a rigorous "Functional Manual."
+
   ### Input Data
-  - Logical Primitives (JSON): {raw_primitives}
-  - Motion Primitives (JSON): {raw_motions}
-  
+  Logic Primitives (Markdown):
+  {raw_primitives}
+
+  Motion Primitives (Markdown):
+  {raw_motions}
+
   ### STRICT RULES (CRITICAL):
   1. 'function' MUST be under 15 words.
-  2. 'params_logic' MUST be exactly ONE concise sentence summarizing the key parameters. 
-     *Example: "Magnitude sets force strength, target_type defines receiver, and duration controls the stun time."*
-  3. BANNED WORDS: Do NOT use phrases like "atomic integrity", "intent-driven architecture", "seamless transition", or any design philosophy. Just describe the variables.  
-  ### Output Format (Standardized Document)
-  For each entry, provide:
-  - [ID]: [Brief Function Description]
-  - Parameter Logic: [How specific values alter the effect]
-  - Tactical Potential: [The smallest logical unit achievable, e.g., Knockback, Haste, Instant Damage]
-  
-  Note: Keep the output concise. Strip away redundant JSON brackets and convert them into high-density structured text.
+  2. 'params_logic' MUST be exactly ONE concise sentence summarizing the key parameters.
+     Example: "source selects weapon_multiplier (level-scaled) or absolute (flat); category sets damage/heal/self_damage; tag names the element."
+  3. BANNED WORDS: Do NOT use design philosophy phrases. Just describe mechanics.
+  4. Cover EVERY primitive listed — do not skip any entry.
+
+  ### Key Notes for Accuracy:
+  - OP_MODIFY_HP: value is ALWAYS positive. 'source' controls scaling (weapon_multiplier vs absolute). 'category' controls direction (damage reduces HP, heal restores HP, self_damage reduces own HP capped at 1).
+  - OP_SPAWN_PROJECTILE: spawns a projectile by referencing a projectile_id from ProjectileDatabase. count and spread_angle control multi-shot patterns.
+  - OP_ARC: sweeps the weapon along a circular orbit defined by radius and angle range. time_start/time_end allow multiple primitives to run in parallel within one attack.
+  - All motion primitives support time_start/time_end for precise sequencing within the attack duration window.
+
+  ### Output Format
+  For each primitive, provide:
+  - [ID]: [Brief Function Description (≤15 words)]
+  - Parameter Logic: [One sentence on how key values alter the effect]

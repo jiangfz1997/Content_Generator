@@ -1,6 +1,6 @@
 # Primitives API (Logic & Physics)
-> Generated on: 2026-03-10 22:21:07
-> Total entries: 4
+> Generated on: 2026-03-15 20:06:48
+> Total entries: 5
 
 ## `OP_APPLY_FORCE`
 - **Class:** `PrimitiveApplyForce`
@@ -20,9 +20,11 @@
 ### Parameters
 | Param | Type | Description |
 | :--- | :--- | :--- |
-| `value` | `float` | The amount to modify the health. Positive values heal the target, negative values deal damage. |
-| `is_percentage` | `boolean` | If true, the 'value' is treated as a percentage of the target's maximum health (e.g., -0.5 removes 50% of max HP). |
-| `tag` | `string` | The elemental or contextual tag for this modification (e.g., 'physical', 'fire', 'heal', 'true_damage'). Useful for damage resistance or weakness calculations. |
+| `value` | `float` | Always a POSITIVE number. When source is 'weapon_multiplier', this is a COEFFICIENT of the weapon's scaled base_damage (e.g., 1.0 = 100% weapon damage, 1.5 = 150%, 0.25 = 25% per DOT tick). When source is 'absolute', this is a flat HP amount that does not scale with level. |
+| `source` | `string` | 'weapon_multiplier': value is a multiplier of ctx.WeaponDamage — scales with player level and weapon design_level. 'absolute': value is a flat number, always the same regardless of level. Use 'absolute' for fixed costs (e.g. sacrifice, healing items). Defaults to 'absolute'. |
+| `category` | `string` | 'damage': reduces target HP (value applied as negative). 'heal': restores target HP (value applied as positive). 'self_damage': reduces own HP, capped to leave 1 HP. Defaults to 'damage'. |
+| `tag` | `string` | Element or context: 'physical', 'fire', 'ice', 'poison', 'lightning', 'magic', 'true', 'sacrifice', 'heal', 'lifesteal'. |
+| `target_type` | `string` | Who receives the modification: 'self' or 'target'. Defaults to 'target'. |
 
 ---
 ## `OP_MODIFY_SPEED`
@@ -35,6 +37,17 @@
 | `target_type` | `string` | Specifies who receives the speed modification. Valid options are 'self' (the caster) or 'target' (the hit entity). Defaults to 'target'. |
 | `mode` | `string` | The mathematical operation to apply. Valid options: 'Set' (overrides current speed), 'Add' (adds to current speed), or 'Multiplier' (multiplies current speed). |
 | `duration` | `float` | The duration in seconds. CRITICAL: If greater than 0, it applies a temporary logic-level buff/debuff to the AI's movement system (e.g., a 3-second slow). If exactly 0, it applies an instant physics-level impulse by directly modifying the Rigidbody's velocity (e.g., a dash or knockback). |
+
+---
+## `OP_SPAWN_PROJECTILE`
+- **Class:** `PrimitiveSpawnProjectile`
+
+### Parameters
+| Param | Type | Description |
+| :--- | :--- | :--- |
+| `projectile_id` | `string` | ID of the projectile definition in ProjectileDatabase (e.g. 'projectile_bullet'). |
+| `count` | `int` | Number of projectiles to fire simultaneously. Default 1. |
+| `spread_angle` | `float` | Total spread angle in degrees when count > 1. E.g. 30 means projectiles fan out over a 30-degree arc. Default 0. |
 
 ---
 ## `OP_TIMER`

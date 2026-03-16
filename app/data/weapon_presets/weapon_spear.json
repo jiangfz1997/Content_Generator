@@ -1,13 +1,9 @@
-
 {
   "id": "weapon_spear",
-  "name": "Mjolnir Prototype",
-  "abilities": {
-    "on_hit": ["payload_heavy_smash"]
-  },
+  "name": "weapon spear",
   "stats": {
     "range": 1.5,
-    "duration": 5.5,
+    "duration": 0.4,
     "cooldown": 0.4
   },
   "motions": [
@@ -15,9 +11,15 @@
       "primitive_id": "OP_MOVE",
       "params": {
         "start": { "x": 0, "y": 0 },
-        "end":   { "x": 3.0, "y": 0 }, 
-        "curve": "PingPong" 
+        "end":   { "x": 3.0, "y": 0 },
+        "curve": "PingPong"
       }
     }
-  ]
+  ],
+  "abilities": {
+    "on_hit":    ["payload_strike", "payload_knockback"],
+    "on_attack": [],
+    "on_equip":  []
+  },
+  "icon": "weapon_axe.png"
 }
