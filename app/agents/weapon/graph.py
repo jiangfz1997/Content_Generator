@@ -1,8 +1,3 @@
-import json
-
-from app.agents.weapon.state import WeaponState
-from typing import TypedDict, Dict, Any
-from langgraph.graph import StateGraph, END
 from langchain_core.prompts import load_prompt
 
 from app.core.global_prompts import GLOBAL_DESIGN_CONSTITUTION
@@ -10,10 +5,8 @@ from app.core.state import GlobalState
 from app.services.engine_docs_manager import engine_docs_manager
 from app.services.llm_service import llm_service
 from app.core.config import settings
-from app.models.schemas import WeaponSchema, WeaponPatchSchema, apply_weapon_patch
-from app.services.primitive_registery import primitive_registry
+from app.models.schemas import WeaponSchema
 from app.utils.callbacks import AgentConsoleCallback
-from app.utils.formatter import format_registries_for_llm_yaml
 from app.utils.inject_prompts import inject_prompts
 
 
@@ -50,7 +43,6 @@ class WeaponAgent:
         # )
         engine_manual_md = await engine_docs_manager.get_markdown_manual()
 
-        # 🌟 2. 提取历史记忆 (让它知道自己之前造过什么，避免重复)
         history = state.get("generation_history", [])
         history_str = "\n".join([f"- {w['weapon_id']}" for w in history]) if history else "No weapons created yet."
 
@@ -58,23 +50,15 @@ class WeaponAgent:
             weapon_obj: WeaponSchema = await self.chain.ainvoke({
                 "biome": state["biome"],
                 "level": state["level"],
-                "materials": state["materials"],  # 记得这里如果是列表，最好转成字符串
+                "materials": state["materials"],
                 "weapons": state["weapons"],
                 "concept": state.get("design_concept", ""),
                 "feedback": state.get("tech_feedback", "None"),
-
-                # 🌟 3. 直接注入这两大核心上下文！取代之前的 registry_context
                 "engine_manual": engine_manual_md,
                 "past_weapons": history_str
             },
-                # 🌟 顺手把我们写好的打字机回调加上，看着它流式思考
                 config={"callbacks": [AgentConsoleCallback(agent_name="WeaponAgent")]})
 
-            # 🌟 4. 生成成功后，别忘了把新武器存入记忆！
-            state.setdefault("generation_history", []).append({
-                "weapon_id": weapon_obj.id,  # 假设你的 Schema 里叫这个
-                # "payload": weapon_obj.primary_payload_id
-            })
 
             return {"final_output": weapon_obj.model_dump(), "generation_history": state["generation_history"]}
         except Exception as e:

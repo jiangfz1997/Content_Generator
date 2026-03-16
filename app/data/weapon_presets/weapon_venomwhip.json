@@ -1,0 +1,40 @@
+{
+  "id": "weapon_venomwhip",
+  "name": "Venomwhip",
+  "stats": {
+    "range": 3.0,
+    "duration": 4.5,
+    "cooldown": 0.7
+  },
+  "visual_stats": {
+    "world_length": 2.6,
+    "pivot": { "x": 0.1, "y": 0.0 }
+  },
+  "motions": [
+    {
+      "primitive_id": "OP_MOVE",
+      "params": {
+        "start": { "x": 0.0, "y": 0.0, "z": 0.0 },
+        "end":   { "x": 1.2, "y": 0.0, "z": 0.0 },
+        "curve": "EaseOut",
+        "time_start": 0.0,
+        "time_end": 0.3
+      }
+    },
+    {
+      "primitive_id": "OP_ROTATE",
+      "params": {
+        "start": -20.0,
+        "end": -160.0,
+        "curve": "EaseOut",
+        "time_start": 0.0,
+        "time_end": 1.0
+      }
+    }
+  ],
+  "abilities": {
+    "on_hit": ["payload_poison_burst"],
+    "on_equip": []
+  },
+  "icon": "weapon_axe.png"
+}

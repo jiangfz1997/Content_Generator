@@ -21,9 +21,12 @@ class Settings:
     # MOTION_PATH = DATA_DIR / "primitive_motions.json"
     PRIMITIVES_PATH = DATA_DIR / "PrimitivesSchema.md"
     MOTION_PATH = DATA_DIR / "MotionPrimitivesSchema.md"
+    WEAPON_PRESET_PATH = DATA_DIR / "weapon_presets"
+
+
     OLLAMA_BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
     MODEL_NAME = "qwen2.5-coder:14b"
 
-
+    PIPELINE_TIMEOUT_SECS = 30.0
 # 导出单例供全局使用
 settings = Settings()

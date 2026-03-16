@@ -1,0 +1,51 @@
+{
+  "id": "weapon_blazing_inferno",
+  "name": "Blazing Inferno",
+  "stats": {
+    "range": 3.0,
+    "duration": 1.0,
+    "cooldown": 0.8
+  },
+  "visual_stats": {
+    "world_length": 2.5,
+    "pivot": {
+      "x": 0.2,
+      "y": 0.5
+    }
+  },
+  "motions": [
+    {
+      "primitive_id": "OP_ROTATE",
+      "params": {
+        "start": 0.0,
+        "end": 360.0,
+        "curve": "EaseOut"
+      }
+    },
+    {
+      "primitive_id": "OP_MOVE",
+      "params": {
+        "start": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "end": {
+          "x": 1.5,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "curve": "Linear"
+      }
+    }
+  ],
+  "abilities": {
+    "on_hit": [
+      "payload_fire_burn"
+    ],
+    "on_equip": [
+      "payload_fire_burn"
+    ]
+  },
+  "icon": "weapon_axe.png"
+}

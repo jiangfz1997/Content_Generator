@@ -1,0 +1,41 @@
+{
+  "id": "weapon_frostmaul",
+  "name": "Frostmaul",
+  "stats": {
+    "range": 2.0,
+    "duration": 0.7,
+    "cooldown": 1.4
+  },
+  "visual_stats": {
+    "world_length": 1.8,
+    "pivot": { "x": 0.15, "y": 0.0 }
+  },
+  "motions": [
+    {
+      "primitive_id": "OP_ARC",
+      "params": {
+        "radius": 1.8,
+        "start_angle": 100,
+        "end_angle": -130,
+        "curve": "EaseIn",
+        "time_start": 0.0,
+        "time_end": 0.9
+      }
+    },
+    {
+      "primitive_id": "OP_SCALE",
+      "params": {
+        "start": { "x": 1.0, "y": 1.0, "z": 1.0 },
+        "end":   { "x": 1.4, "y": 1.4, "z": 1.0 },
+        "curve": "EaseOut",
+        "time_start": 0.5,
+        "time_end": 0.85
+      }
+    }
+  ],
+  "abilities": {
+    "on_hit": ["payload_ice_freeze"],
+    "on_equip": []
+  },
+  "icon": "weapon_axe.png"
+}

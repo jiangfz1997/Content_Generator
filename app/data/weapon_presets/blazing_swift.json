@@ -1,0 +1,44 @@
+{
+  "id": "blazing_swift",
+  "name": "Blazing Swift",
+  "stats": {
+    "range": 2.5,
+    "duration": 1.0,
+    "cooldown": 0.3
+  },
+  "visual_stats": {
+    "world_length": 2.5,
+    "pivot": {
+      "x": 0.2,
+      "y": 0.0,
+      "z": 0.0
+    }
+  },
+  "motions": [
+    {
+      "primitive_id": "OP_MOVE",
+      "params": {
+        "start": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "end": {
+          "x": 2.5,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "curve": "Linear"
+      }
+    }
+  ],
+  "abilities": {
+    "on_hit": [
+      "payload_fire_burn"
+    ],
+    "on_equip": [
+      "payload_fire_burn"
+    ]
+  },
+  "icon": "weapon_axe.png"
+}

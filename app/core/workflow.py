@@ -21,8 +21,10 @@ def build_smart_workflow():
     # 🌟 闸机 1：Idea 行不行？
     def idea_gatekeeper(state: GlobalState):
         if not state.get("is_idea_passed"):
-            print(f"❌ [Idea 拒稿] 理由: {state.get('idea_feedback')} -> 打回策划重写！")
-            return "designer"  # 核心：直接打回，根本不触发 weapon_designer
+            if state.get("retry_count", 0) >= 1:
+                print(f"⚠️ [Idea 拒稿] 理由: {state.get('idea_feedback')} -> 已经重试过{state.get("retry_count", 0)}次了，直接放行进入数值调优阶段！")
+                return "weapon_designer"  # 强制放行
+            return "designer"
 
         print("✅ [Idea 过审] -> 发送给技术部生成 JSON。")
         return "weapon_designer"
@@ -39,8 +41,10 @@ def build_smart_workflow():
     # 🌟 闸机 2：JSON 数值行不行？
     def tech_gatekeeper(state: GlobalState):
         if not state.get("is_final_passed"):
-            print(f"⚠️ [Tech 拒稿] 理由: {state.get('tech_feedback')} -> 打回技术重调数值！")
-            return "weapon_designer"  # 核心：只打回技术部，不需要策划重新想 Idea
+            if state.get("audit_attempts", 0) >= 2:
+                print(f"⚠️ [数值拒稿] 理由: {state.get('tech_feedback')} -> 已经重试过{state.get("audit_attempts", 0)}次了，直接放行进入最终阶段！")
+                return END  # 强制输出当前结果
+            return "weapon_designer"
 
         print("🎉 [终审过关] -> 准备发送给 Unity！")
         return END

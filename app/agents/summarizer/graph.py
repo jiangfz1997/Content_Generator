@@ -4,11 +4,10 @@ from langchain_core.prompts import load_prompt
 
 from app.core.config import settings
 from app.core.global_prompts import GLOBAL_DESIGN_CONSTITUTION
-from app.services.primitive_registery import primitive_registry
+from app.services.primitive_registry import primitive_registry
 from app.utils.callbacks import AgentConsoleCallback
 from app.utils.inject_prompts import inject_prompts
-from app.websocket.handlers import llm_service
-
+from app.services.llm_service import llm_service
 
 from pydantic import BaseModel, Field
 from typing import List, Dict

@@ -1,0 +1,17 @@
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb_service
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: 123123
+    volumes:
+      - ./data/mongo_db:/data/db
+    networks:
+      - robinson_net
+
+networks:
+  robinson_net:
+    driver: bridge

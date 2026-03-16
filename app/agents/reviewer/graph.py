@@ -4,7 +4,6 @@ from app.core.state import GlobalState  # 你的状态定义
 from app.core.config import settings
 from langchain_core.prompts import ChatPromptTemplate, load_prompt
 from app.services.llm_service import llm_service
-from app.services.primitive_registery import get_shared_engine_context
 
 # 🌟 引入新的极简文档管理器和控制台回调
 from app.services.engine_docs_manager import engine_docs_manager
@@ -75,7 +74,8 @@ class ReviewerAgent:
         # 返回局部状态更新
         return {
             "is_idea_passed": result.is_idea_passed,
-            "idea_feedback": result.idea_feedback
+            "idea_feedback": result.idea_feedback,
+            "retry_count": state.get("retry_count", 0) + (0 if result.is_idea_passed else 1),
         }
 
     # ==========================================
@@ -91,12 +91,10 @@ class ReviewerAgent:
 
         engine_manual_md = await engine_docs_manager.get_markdown_manual()
 
-        # 🌟 2. 拿到要审核的武器 JSON (避免传 None 导致 dumps 报错)
         final_weapon_data = state.get("final_output", {})
         weapon_json_str = json.dumps(final_weapon_data, ensure_ascii=False) if final_weapon_data else "{}"
         print("\n[TechAuditor] 正在对照引擎底层手册进行最终校验...")
 
-        # 🌟 3. 发起调用，只传必须的参数
         result: TechAuditResult = await self.tech_chain.ainvoke({
             "biome": state.get("biome", "Unknown"),
             "level": state.get("level", 1),
@@ -110,8 +108,13 @@ class ReviewerAgent:
         color = "\033[92m" if result.is_final_passed else "\033[91m"
         print(f"{color}[Tech Audit] Passed: {result.is_final_passed} | Feedback: {result.tech_feedback}\033[0m")
 
-        return {"is_final_passed": result.is_final_passed, "tech_feedback": result.tech_feedback}
+        if result.is_final_passed:
+            state.setdefault("generation_history", []).append({
+                "weapon_id": final_weapon_data.get("id"),
+            })
+        return {"is_final_passed": result.is_final_passed,
+                "tech_feedback": result.tech_feedback,
+                "audit_attempts": attempts + 1,
+                }
 
-
-# 单例实例化
 reviewer_agent = ReviewerAgent()

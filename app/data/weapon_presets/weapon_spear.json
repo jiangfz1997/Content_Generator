@@ -1,0 +1,23 @@
+
+{
+  "id": "weapon_spear",
+  "name": "Mjolnir Prototype",
+  "abilities": {
+    "on_hit": ["payload_heavy_smash"]
+  },
+  "stats": {
+    "range": 1.5,
+    "duration": 5.5,
+    "cooldown": 0.4
+  },
+  "motions": [
+    {
+      "primitive_id": "OP_MOVE",
+      "params": {
+        "start": { "x": 0, "y": 0 },
+        "end":   { "x": 3.0, "y": 0 }, 
+        "curve": "PingPong" 
+      }
+    }
+  ]
+}

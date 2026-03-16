@@ -1,0 +1,41 @@
+{
+  "id": "weapon_cinderbrand",
+  "name": "Cinderbrand",
+  "stats": {
+    "range": 2.5,
+    "duration": 5.5,
+    "cooldown": 0.8
+  },
+  "visual_stats": {
+    "world_length": 2.2,
+    "pivot": { "x": 0.15, "y": 0.0 }
+  },
+  "motions": [
+    {
+      "primitive_id": "OP_ARC",
+      "params": {
+        "radius": 2.0,
+        "start_angle": 65,
+        "end_angle": -95,
+        "curve": "EaseInOut",
+        "time_start": 0.0,
+        "time_end": 1.0
+      }
+    },
+    {
+      "primitive_id": "OP_SCALE",
+      "params": {
+        "start": { "x": 1.0, "y": 1.0, "z": 1.0 },
+        "end":   { "x": 1.0, "y": 1.4, "z": 1.0 },
+        "curve": "PingPong",
+        "time_start": 0.2,
+        "time_end": 0.8
+      }
+    }
+  ],
+  "abilities": {
+    "on_hit": ["payload_fire_burn"],
+    "on_equip": []
+  },
+  "icon": "weapon_axe.png"
+}

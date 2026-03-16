@@ -1,12 +1,12 @@
+import asyncio
 import time
 
 from app.agents.weapon.graph import weapon_agent
+from app.core.config import settings
 from app.services.engine_docs_manager import engine_docs_manager
 from app.websocket.protocol import NetPacket, GenerationRequest, WeaponGenerateEvent
-from app.services.llm_service import LLMService
 from app.core.workflow import global_graph
 
-llm_service = LLMService()
 
 async def handle_generation_request(websocket, raw_message: str):
     """
@@ -26,13 +26,19 @@ async def handle_generation_request(websocket, raw_message: str):
         #     "level": req.player_level
         # })
         # print(f"[Handler] AI 生成的武器数据: {weapon_data}")
-        final_state = await global_graph.ainvoke({
-            "prompt": req.prompt,
-            "materials": req.materials,
-            "biome": req.biome,
-            "level": req.player_level,
-            "weapons": req.weapons,
-        })
+        try:
+            final_state = await global_graph.ainvoke({
+                "prompt": req.prompt,
+                "materials": req.materials,
+                "biome": req.biome,
+                "level": req.player_level,
+                "weapons": req.weapons,
+            },
+            timeout = settings.PIPELINE_TIMEOUT_SECS)
+        except asyncio.TimeoutError:
+            await websocket.send(NetPacket(msgType="ErrorEvent", payload={"error": "generation_timeout"}).to_json())
+            print(f"❌ [Handler] 武器生成超时！可能是 Idea 太烂或数值始终调不平，触发了熔断。")
+            return
         # routed_dept = final_state.get("next_agent")
         output_data = final_state.get("final_output")
 

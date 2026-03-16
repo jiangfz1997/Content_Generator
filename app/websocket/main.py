@@ -2,10 +2,14 @@ import asyncio
 import json
 import websockets
 
+from app.core.config import settings
+from app.db.mongodb import db
+from app.db.seeder import seed_preset_weapons
 from app.services.engine_docs_manager import engine_docs_manager
 from handlers import handle_generation_request
 from dotenv import load_dotenv
 import os
+from app.services.mongo_service.weapon_services import weapon_mongo_service
 
 load_dotenv()
 # 路由表：Action -> Handler Function
@@ -21,7 +25,6 @@ async def connection_handler(websocket):
     try:
         async for message in websocket:
 
-            # 1. 基础预处理
             try:
                 data = json.loads(message)
                 payload = data.get("payload")
@@ -46,11 +49,21 @@ async def connection_handler(websocket):
     except Exception as e:
         print(f"[Server] 全局错误: {e}")
 
+def _log_init_result(task: asyncio.Task) -> None:
+    exc = task.exception() if not task.cancelled() else None
+    if exc:
+        print(f"[Init] ⚠️ 引擎手册预加载失败，首次请求时将触发冷启动: {exc}")
+    else:
+        print("[Init] ✅ 引擎手册预加载完成")
 
 async def main():
-
+    await db.connect()
     port = 8080
+    # Generate the engine manual into cache. Used for LLM agents to understand how to use the infos.
     init_task = asyncio.create_task(engine_docs_manager.get_markdown_manual())
+    init_task.add_done_callback(_log_init_result)
+    # load preset weapons into MongoDB, so that the LLM can query them when crafting.
+    await weapon_mongo_service.load_preset_weapons()
     async with websockets.serve(connection_handler, "localhost", port):
         print(f"✅ WebSocket Server 运行在 ws://localhost:{port}")
         # 保持运行

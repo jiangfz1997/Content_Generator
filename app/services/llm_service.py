@@ -23,7 +23,7 @@ class LLMService:
             base_url="http://localhost:11434",
         )
 
-        api_key = os.getenv("OPENAI_API_KEY", "your-fallback-key-here")
+        api_key = os.getenv("OPENAI_API_KEY")
         base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
         self.gpt_model = ChatOpenAI(
             model = os.getenv("ONLINE_NANO_MODEL"),

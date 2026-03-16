@@ -1,0 +1,40 @@
+{
+  "id": "weapon_thunderlance",
+  "name": "Thunderlance",
+  "stats": {
+    "range": 3.5,
+    "duration": 3.5,
+    "cooldown": 0.6
+  },
+  "visual_stats": {
+    "world_length": 3.0,
+    "pivot": { "x": 0.1, "y": 0.0 }
+  },
+  "motions": [
+    {
+      "primitive_id": "OP_MOVE",
+      "params": {
+        "start": { "x": 0.0, "y": 0.0, "z": 0.0 },
+        "end":   { "x": 3.5, "y": 0.0, "z": 0.0 },
+        "curve": "EaseOut",
+        "time_start": 0.0,
+        "time_end": 0.45
+      }
+    },
+    {
+      "primitive_id": "OP_SCALE",
+      "params": {
+        "start": { "x": 1.0, "y": 1.0, "z": 1.0 },
+        "end":   { "x": 1.2, "y": 0.7, "z": 1.0 },
+        "curve": "EaseOut",
+        "time_start": 0.0,
+        "time_end": 0.45
+      }
+    }
+  ],
+  "abilities": {
+    "on_hit": ["payload_lightning_strike"],
+    "on_equip": []
+  },
+  "icon": "weapon_axe.png"
+}

@@ -13,18 +13,6 @@ class PrimitiveRegistry:
         self.primitive_motion_path = settings.MOTION_PATH
         self._cache = {}
 
-    # def get_all_primitives(self) -> dict:
-    #     """从 JSON 加载所有可选的动作和效果"""
-    #     try:
-    #         with open(self.primitive_path, "r", encoding="utf-8") as f:
-    #             self._cache = json.load(f)
-    #         return self._cache
-    #     except Exception as e:
-    #         print(f"Load Primitives failed: {e}")
-    #         return {
-    #             "motion_primitives": ["OP_MOVE", "OP_ROTATE"],
-    #             "ability_payloads": ["payload_fire_burn", "payload_ice_freeze"]
-    #         }
 
     def get_primitives_schema(self) -> str:
         """读取 Primitives 的 Markdown 定义"""

@@ -1,0 +1,32 @@
+
+  {
+  "id": "weapon_axe_2",
+  "icon": "weapon_axe.png",
+  "name": "Mjolnir Prototype",
+  "abilities": {
+    "on_hit": ["payload_blood_frenzy"]
+  },
+  "stats": {
+    "range": 1.5,
+    "duration": 5.5,
+    "cooldown": 0.4
+  },
+  "motions": [
+  { 
+    "primitive_id": "OP_ROTATE",
+    "params": {
+      "start": 90,       
+      "end": -90,       
+      "curve": "EaseIn"  
+    }
+  },
+  { 
+    "primitive_id": "OP_MOVE",
+    "params": {
+      "start": {"x": 0.0, "y": 0.0},
+      "end": {"x": 0.5, "y": 0.0},   
+      "curve": "PingPong"             
+    }
+  }
+]
+}
