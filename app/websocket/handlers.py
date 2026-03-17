@@ -32,6 +32,7 @@ async def handle_generation_request(websocket, raw_message: str):
                 "level": req.player_level,
                 "weapons": req.weapons,
                 "session_id": req.session_id or "unknown_session",
+                "world_level": req.world_level,
                 "retry_count": 0,
                 "audit_attempts": 0,
                 "generation_history": [],

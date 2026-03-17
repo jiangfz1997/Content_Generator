@@ -5,6 +5,7 @@ from app.core.global_prompts import GLOBAL_DESIGN_CONSTITUTION
 from app.core.state import GlobalState
 from app.services.engine_docs_manager import engine_docs_manager
 from app.services.llm_service import llm_service
+from app.services.primitive_registry import primitive_registry
 from app.core.config import settings
 from app.models.schemas import WeaponSchema, WeaponPatchSchema, apply_weapon_patch
 from app.utils.callbacks import AgentConsoleCallback
@@ -80,6 +81,11 @@ Output ONLY the fields that need to change."""),
         keywords = concept.get("keywords", [])
         keywords_str = ", ".join(keywords) if keywords else "none specified"
 
+        all_payloads = primitive_registry.get_all_payloads()
+        available_payloads_str = "\n".join(
+            f"- {pid}: {p.get('description', '')}" for pid, p in sorted(all_payloads.items())
+        )
+
         try:
             weapon_obj: WeaponSchema = await self.chain.ainvoke({
                 "biome": state["biome"],
@@ -90,7 +96,8 @@ Output ONLY the fields that need to change."""),
                 "keywords": keywords_str,
                 "feedback": state.get("tech_feedback", "None"),
                 "engine_manual": engine_manual_md,
-                "past_weapons": history_str
+                "past_weapons": history_str,
+                "available_payloads": available_payloads_str,
             },
                 config={"callbacks": [AgentConsoleCallback(agent_name="WeaponAgent")]})
 

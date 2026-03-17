@@ -19,6 +19,10 @@ template: |
   Avoid creating exact duplicates of these previously forged weapons. Ensure variety in your arsenal:
   {past_weapons}
 
+  ### LEGAL PAYLOAD IDs — COPY EXACTLY, DO NOT INVENT
+  The following are the ONLY valid payload IDs. Every ID in `abilities` MUST be one of these strings, copied character-for-character:
+  {available_payloads}
+
   ### Engine Rulebook & Constitution (STRICT CONSTRAINTS)
   This is your absolute source of truth. You MUST ONLY use the Payloads and Primitives defined here:
   {engine_manual}

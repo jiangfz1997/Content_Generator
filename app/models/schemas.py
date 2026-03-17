@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Dict, Any, Optional
 
 from app.models.common_types import Vector2
@@ -51,6 +51,17 @@ class Abilities(BaseModel):
         max_length=2,
         description="Atomic Payload IDs that activate once when the weapon is equipped. MAX 2. Best suited for self-buffs (haste) or persistent costs (sacrifice). If no passive equip effects, return []."
     )
+
+    @model_validator(mode="after")
+    def warn_invalid_payload_ids(self):
+        """Log invalid IDs but keep them — payload_validator_node handles routing."""
+        from app.services.primitive_registry import primitive_registry
+        known = set(primitive_registry.get_all_payloads().keys())
+        all_ids = self.on_hit + self.on_attack + self.on_equip
+        invalid = [pid for pid in all_ids if pid and pid not in known]
+        if invalid:
+            print(f"[Abilities] ⚠️ Invalid payload IDs detected (will be caught by payload_validator): {invalid}")
+        return self
 
 class WeaponSchema(BaseModel):
 

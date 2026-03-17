@@ -21,6 +21,7 @@ class GenerationRequest:
     materials: Optional[list] = None
     weapons: Optional[list] = None
     session_id: Optional[str] = None
+    world_level: int = 1
 
     @staticmethod
     def from_json(json_str: str) -> 'GenerationRequest':
@@ -33,6 +34,7 @@ class GenerationRequest:
             materials=data.get("materials", []),
             weapons=data.get("weapons", []),
             session_id=data.get("session_id"),
+            world_level=data.get("world_level", 1),
         )
 
 # === 对应 Unity 的 WeaponGenerateEvent (发回的响应) ===

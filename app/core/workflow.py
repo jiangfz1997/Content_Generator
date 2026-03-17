@@ -8,6 +8,7 @@ from app.agents.payload_factory.graph import payload_factory_agent
 from app.agents.artist.graph import artist_agent
 from app.services.mongo_service.weapon_services import weapon_mongo_service
 from app.services.primitive_registry import primitive_registry
+from app.services.weapon_evaluator import WeaponEvaluator
 
 
 async def payload_validator_node(state: GlobalState) -> dict:
@@ -52,6 +53,16 @@ async def db_retrieval_node(state: GlobalState):
     return {"reference_weapons": summaries, "similar_weapons": similar}
 
 
+async def power_budget_node(state: GlobalState) -> dict:
+    """Pure-math node: evaluates weapon PowerScore and auto-scales base_damage to fit world_level budget."""
+    weapon      = state.get("final_output") or {}
+    world_level = state.get("world_level") or 1
+
+    updated_weapon, score, budget = WeaponEvaluator.auto_scale(weapon, world_level)
+    print(f"[PowerBudget] world_level={world_level} | budget={budget} | score={score}")
+    return {"final_output": updated_weapon, "power_score": score}
+
+
 def build_smart_workflow():
     builder = StateGraph(GlobalState)
 
@@ -66,6 +77,7 @@ def build_smart_workflow():
     builder.add_node("forge_fork", lambda state: {})                   # 并行分叉点
     builder.add_node("artist", artist_agent.generate_icon_node)        # 图标生成（并行）
     builder.add_node("payload_validator", payload_validator_node)      # 代码级 payload ID 校验
+    builder.add_node("power_budget", power_budget_node)               # 数学级战力评估 + auto-scale
 
     # 2. 第一阶段：DB 检索 -> 策划出草案 -> 立刻过审
     builder.add_edge(START, "db_retrieval")
@@ -125,21 +137,23 @@ def build_smart_workflow():
             attempts = state.get("audit_attempts", 0)
             if attempts >= 3:
                 print(f"⚠️ [数值拒稿] 已修复 {attempts} 次，强制放行。理由: {state.get('tech_feedback')}")
-                return END
+                return "power_budget"
             print(f"💉 [数值拒稿] 第 {attempts} 次，启动外科手术修复。反馈: {state.get('tech_feedback')}")
             return "weapon_patcher"
 
-        print("🎉 [终审过关] -> 准备发送给 Unity！")
-        return END
+        print("🎉 [终审过关] -> 战力评估后发送给 Unity！")
+        return "power_budget"
 
     # 在 tech 审完之后，决定是否结束
     builder.add_conditional_edges("tech_auditor", tech_gatekeeper, {
         "weapon_patcher": "weapon_patcher",
-        END: END
+        "power_budget": "power_budget",
     })
 
-    # patch 完成后回到技术终审
-    builder.add_edge("weapon_patcher", "tech_auditor")
+    builder.add_edge("power_budget", END)
+
+    # patch 完成后先走 payload_validator 二次校验，再进 tech_auditor
+    builder.add_edge("weapon_patcher", "payload_validator")
 
     return builder.compile()
 

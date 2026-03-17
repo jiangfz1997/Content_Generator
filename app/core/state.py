@@ -33,3 +33,5 @@ class GlobalState(TypedDict):
     pending_payload_ids: Optional[List[str]]            # IDs of newly factory-generated payloads
     generated_icon: Optional[str]                      # icon filename produced by artist_node
     payload_valid: Optional[bool]                      # set by payload_validator_node (code, not LLM)
+    world_level: Optional[int]                         # global difficulty from Unity, used for power budget
+    power_score: Optional[float]                       # computed by WeaponEvaluator after generation
