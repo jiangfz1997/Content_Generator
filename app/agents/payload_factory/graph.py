@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.core.state import GlobalState
 from app.services.engine_docs_manager import engine_docs_manager
 from app.services.llm_service import llm_service
-from app.utils.callbacks import AgentConsoleCallback
+from app.utils.callbacks import make_callbacks
 
 
 # Known parameter keys per primitive — used to rescue flat-layout outputs
@@ -180,7 +180,7 @@ class PayloadFactoryAgent:
                     "payload_description": description,
                     "primitive_hint": primitive_hint,
                 },
-                config={"callbacks": [AgentConsoleCallback(agent_name="PayloadFactory")]},
+                config={"callbacks": make_callbacks("PayloadFactory", state.get("session_id", "default"))},
             )
         except Exception as e:
             print(f"[PayloadFactory] Generation failed: {e}")
@@ -196,15 +196,25 @@ class PayloadFactoryAgent:
             "sequence": [entry.model_dump() for entry in result.sequence],
         }
 
-        # Save to payloads directory
-        save_path: Path = settings.PAYLOADS_PATH / f"{final_id}.json"
+        # Backup to disk (per-session subfolder)
+        session_id = state.get("session_id", "default")
+        session_dir = settings.SESSIONS_DIR / session_id / "payloads"
+        save_path: Path = session_dir / f"{final_id}.json"
         try:
-            settings.PAYLOADS_PATH.mkdir(parents=True, exist_ok=True)
+            session_dir.mkdir(parents=True, exist_ok=True)
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(payload_dict, f, indent=2, ensure_ascii=False)
-            print(f"[PayloadFactory] Saved: {save_path}")
+            print(f"[PayloadFactory] Backup saved: {save_path}")
         except Exception as e:
             print(f"[PayloadFactory] Failed to save payload file: {e}")
+
+        # Persist to MongoDB + update in-memory cache so downstream nodes see the new ID
+        try:
+            from app.services.mongo_service.payloads_services import payload_mongo_service
+            await payload_mongo_service.save_generated_payload(session_id, payload_dict)
+            primitive_registry.add_payload(final_id, payload_dict)
+        except Exception as e:
+            print(f"[PayloadFactory] DB save failed (cache still updated): {e}")
 
         # Append new payload info to the in-memory engine manual so downstream nodes see it
         new_entry = (

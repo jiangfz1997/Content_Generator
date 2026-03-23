@@ -1,10 +1,12 @@
 from app.core.state import GlobalState
+from app.core.config import settings
 from langgraph.graph import StateGraph, START, END
 
 from app.agents.weapon.graph import weapon_agent
 from app.agents.designer.graph import designer_agent
 from app.agents.reviewer.graph import reviewer_agent
 from app.agents.payload_factory.graph import payload_factory_agent
+from app.agents.projectile_factory.graph import projectile_factory_agent
 from app.agents.artist.graph import artist_agent
 from app.services.mongo_service.weapon_services import weapon_mongo_service
 from app.services.primitive_registry import primitive_registry
@@ -25,7 +27,9 @@ async def payload_validator_node(state: GlobalState) -> dict:
         (abilities.get("on_equip") or [])
     )
 
-    known = set(primitive_registry.get_all_payloads().keys())
+    # payload_shoot_generic is engine built-in — no JSON file, always valid
+    _ENGINE_BUILTIN_PAYLOADS = {"payload_shoot_generic"}
+    known = set(primitive_registry.get_all_payloads().keys()) | _ENGINE_BUILTIN_PAYLOADS
     invalid = [p for p in used if p and p not in known]
 
     if invalid:
@@ -73,16 +77,39 @@ def build_smart_workflow():
     builder.add_node("weapon_designer", weapon_agent.crafting_node)  # 昂贵的 JSON 生成
     builder.add_node("weapon_patcher", weapon_agent.patch_node)       # 外科手术修复
     builder.add_node("tech_auditor", reviewer_agent.tech_audit_node)  # 终审数值
-    builder.add_node("payload_factory", payload_factory_agent.generate_node)  # 按需生成新 Payload
+    builder.add_node("payload_factory", payload_factory_agent.generate_node)        # 按需生成新 Payload
+    builder.add_node("projectile_factory", projectile_factory_agent.generate_node)  # 按需生成新 Projectile
     builder.add_node("forge_fork", lambda state: {})                   # 并行分叉点
     builder.add_node("artist", artist_agent.generate_icon_node)        # 图标生成（并行）
     builder.add_node("payload_validator", payload_validator_node)      # 代码级 payload ID 校验
     builder.add_node("power_budget", power_budget_node)               # 数学级战力评估 + auto-scale
 
-    # 2. 第一阶段：DB 检索 -> 策划出草案 -> 立刻过审
+    # 2. 第一阶段：DB 检索 -> 策划出草案 -> 立刻过审（可配置跳过）
     builder.add_edge(START, "db_retrieval")
     builder.add_edge("db_retrieval", "designer")
-    builder.add_edge("designer", "concept_reviewer")
+
+    def _factory_route(concept: dict) -> str:
+        """Determine which factory to visit next (payload → projectile → forge_fork)."""
+        if isinstance(concept, dict):
+            if concept.get("needs_new_payload"):
+                print(f"🏭 [Payload Factory] 设计师请求新 Payload: {concept.get('new_payload_spec', {}).get('id', '?')}")
+                return "payload_factory"
+            if concept.get("needs_new_projectile"):
+                print(f"🚀 [Projectile Factory] 设计师请求新 Projectile: {concept.get('new_projectile_spec', {}).get('id', '?')}")
+                return "projectile_factory"
+        return "forge_fork"
+
+    if settings.SKIP_IDEA_AUDIT:
+        print("⚡ [Workflow] SKIP_IDEA_AUDIT=True — concept_reviewer 已跳过")
+        def designer_shortcut(state: GlobalState):
+            return _factory_route(state.get("design_concept", {}))
+        builder.add_conditional_edges("designer", designer_shortcut, {
+            "payload_factory": "payload_factory",
+            "projectile_factory": "projectile_factory",
+            "forge_fork": "forge_fork",
+        })
+    else:
+        builder.add_edge("designer", "concept_reviewer")
 
     # 🌟 闸机 1：Idea 行不行？
     def idea_gatekeeper(state: GlobalState):
@@ -90,28 +117,35 @@ def build_smart_workflow():
             retries = state.get("retry_count", 0)
             if retries >= 2:
                 print(f"⚠️ [Idea 拒稿] 已重试 {retries} 次，携带反馈强制进入武器生成阶段。理由: {state.get('idea_feedback')}")
-                return "weapon_designer"
+                return "forge_fork"
             print(f"🔁 [Idea 拒稿] 第 {retries + 1} 次返工，反馈: {state.get('idea_feedback')}")
             return "designer"
 
-        # Idea passed — check if designer requested a new payload
-        concept = state.get("design_concept", {})
-        if isinstance(concept, dict) and concept.get("needs_new_payload"):
-            print(f"🏭 [Payload Factory] 设计师请求新 Payload: {concept.get('new_payload_spec', {}).get('id', '?')}")
-            return "payload_factory"
+        print("✅ [Idea 过审] -> 检查工厂需求...")
+        return _factory_route(state.get("design_concept", {}))
 
-        print("✅ [Idea 过审] -> 分叉：weapon_designer ∥ artist。")
-        return "forge_fork"
-
-    # 在 idea 审完之后，决定走向
     builder.add_conditional_edges("concept_reviewer", idea_gatekeeper, {
         "designer": "designer",
         "payload_factory": "payload_factory",
+        "projectile_factory": "projectile_factory",
         "forge_fork": "forge_fork",
     })
 
-    # payload factory 完成后也走 forge_fork（artist 同样并行）
-    builder.add_edge("payload_factory", "forge_fork")
+    # payload_factory 完成后检查是否还需要 projectile_factory
+    def after_payload_factory(state: GlobalState) -> str:
+        concept = state.get("design_concept", {})
+        if isinstance(concept, dict) and concept.get("needs_new_projectile"):
+            print(f"🚀 [Projectile Factory] payload 生成完毕，继续生成 Projectile: {concept.get('new_projectile_spec', {}).get('id', '?')}")
+            return "projectile_factory"
+        return "forge_fork"
+
+    builder.add_conditional_edges("payload_factory", after_payload_factory, {
+        "projectile_factory": "projectile_factory",
+        "forge_fork": "forge_fork",
+    })
+
+    # projectile_factory 完成后直接进 forge_fork
+    builder.add_edge("projectile_factory", "forge_fork")
 
     # forge_fork 扇出：weapon_designer 和 artist 并行
     builder.add_edge("forge_fork", "weapon_designer")
@@ -124,11 +158,15 @@ def build_smart_workflow():
         if state.get("payload_valid") is False:
             print("💉 [PayloadValidator] 路由至 weapon_patcher 修复非法 payload ID")
             return "weapon_patcher"
+        if settings.SKIP_TECH_AUDIT:
+            print("⚡ [Workflow] SKIP_TECH_AUDIT=True — tech_auditor 已跳过")
+            return "power_budget"
         return "tech_auditor"
 
     builder.add_conditional_edges("payload_validator", payload_validator_gate, {
         "weapon_patcher": "weapon_patcher",
         "tech_auditor": "tech_auditor",
+        "power_budget": "power_budget",
     })
 
     # 🌟 闸机 2：JSON 数值行不行？

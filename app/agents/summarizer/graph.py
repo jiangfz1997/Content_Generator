@@ -5,7 +5,7 @@ from langchain_core.prompts import load_prompt
 from app.core.config import settings
 from app.core.global_prompts import GLOBAL_DESIGN_CONSTITUTION
 from app.services.primitive_registry import primitive_registry
-from app.utils.callbacks import AgentConsoleCallback
+from app.utils.callbacks import make_callbacks
 from app.utils.inject_prompts import inject_prompts
 from app.services.llm_service import llm_service
 
@@ -59,7 +59,7 @@ class SummarizerAgent:
             "raw_primitives": raw_primitives_md,
             "raw_motions": raw_motions_md
         },
-        config = {"callbacks": [AgentConsoleCallback(agent_name="SummarizerAgent")]},)
+        config = {"callbacks": make_callbacks("SummarizerAgent")},)
 
         # --- 第二步：作为上下文解析 Payloads ---
         raw_payloads_dict = primitive_registry.get_all_payloads()
@@ -82,7 +82,25 @@ class SummarizerAgent:
             "primitive_manual": manual_str,
             "raw_payloads": json.dumps(raw_payloads_dict, ensure_ascii=False)
         },
-        config={"callbacks": [AgentConsoleCallback(agent_name="SummarizerAgent")]},)
+        config={"callbacks": make_callbacks("SummarizerAgent")},)
+
+        # --- Post-generation validation ---
+        disk_ids = set(raw_payloads_dict.keys())
+        generated_ids = {p.id for p in final_manual.payload_catalog}
+
+        missing = disk_ids - generated_ids
+        if missing:
+            print(f"[Summarizer] ⚠️  Missing from catalog (LLM truncated): {sorted(missing)}")
+
+        logic_seen: dict[str, str] = {}
+        for p in final_manual.payload_catalog:
+            if p.combination_logic in logic_seen:
+                print(f"[Summarizer] ⚠️  Duplicate logic: '{p.id}' has same description as '{logic_seen[p.combination_logic]}'")
+            else:
+                logic_seen[p.combination_logic] = p.id
+
+        if missing or len(logic_seen) < len(final_manual.payload_catalog):
+            print("[Summarizer] ⚠️  Catalog has quality issues — delete instruction_manual.md and re-run to regenerate.")
 
         return final_manual, manual_str
 

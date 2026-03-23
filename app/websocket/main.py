@@ -10,6 +10,9 @@ from handlers import handle_generation_request
 from dotenv import load_dotenv
 import os
 from app.services.mongo_service.weapon_services import weapon_mongo_service
+from app.services.mongo_service.payloads_services import payload_mongo_service
+from app.services.mongo_service.projectiles_services import projectile_mongo_service
+from app.services.primitive_registry import primitive_registry
 
 load_dotenv()
 # 路由表：Action -> Handler Function
@@ -62,8 +65,12 @@ async def main():
     # Generate the engine manual into cache. Used for LLM agents to understand how to use the infos.
     init_task = asyncio.create_task(engine_docs_manager.get_markdown_manual())
     init_task.add_done_callback(_log_init_result)
-    # load preset weapons into MongoDB, so that the LLM can query them when crafting.
+    # Load all presets into MongoDB
     await weapon_mongo_service.load_preset_weapons()
+    await payload_mongo_service.load_preset_payloads()
+    await projectile_mongo_service.load_preset_projectiles()
+    # Populate in-memory registry cache from MongoDB (presets only at startup)
+    await primitive_registry.initialize()
     async with websockets.serve(connection_handler, "localhost", port):
         print(f"✅ WebSocket Server 运行在 ws://localhost:{port}")
         # 保持运行

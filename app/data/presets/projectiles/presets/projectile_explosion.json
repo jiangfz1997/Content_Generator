@@ -1,0 +1,13 @@
+{
+  "id": "projectile_explosion",
+  "name": "Explosion",
+  "stats": {
+    "speed": 0,
+    "lifetime": 0.08,
+    "penetration": 99,
+    "collider_radius": 2.5
+  },
+  "abilities": {
+    "on_hit": ["payload_explosion_damage"]
+  }
+}

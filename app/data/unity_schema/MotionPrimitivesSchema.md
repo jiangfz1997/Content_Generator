@@ -1,5 +1,5 @@
 # Motion Primitives API (Logic & Physics)
-> Generated on: 2026-03-15 20:06:48
+> Generated on: 2026-03-17 18:31:34
 > Total entries: 4
 
 ## `OP_ARC`

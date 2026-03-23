@@ -19,21 +19,39 @@ template: |
   Avoid creating exact duplicates of these previously forged weapons. Ensure variety in your arsenal:
   {past_weapons}
 
-  ### LEGAL PAYLOAD IDs — COPY EXACTLY, DO NOT INVENT
-  The following are the ONLY valid payload IDs. Every ID in `abilities` MUST be one of these strings, copied character-for-character:
-  {available_payloads}
+  ### PROJECTILE (Ranged Weapons)
+  {projectile_hint}
 
-  ### Engine Rulebook & Constitution (STRICT CONSTRAINTS)
-  This is your absolute source of truth. You MUST ONLY use the Payloads and Primitives defined here:
-  {engine_manual}
+  ### PAYLOAD IDs FOR THIS WEAPON (ABSOLUTE CONSTRAINT)
+  The designer has already selected these payload IDs from the catalog. You MUST use ONLY these IDs in `abilities`.
+  Copy them character-for-character. Do NOT substitute, rename, or invent alternatives:
+  {chosen_payload_ids}
+
+  ### Engine Implementation Reference (Motion Primitives & Weapon Schema)
+  Use this to fill `motions`, `stats`, and `visual_stats` correctly:
+  {crafter_manual}
 
   ### Stats Generation Rules
   - Generate stats reflecting the Design Blueprint, mathematically scaled for a Level {level} player.
   - `range`: Daggers (~1.5), Swords (~2.5), Spears (~4.0).
   - `cooldown`: Fast (~0.3), Medium (~0.8), Slow (~1.5).
   - `duration`: HARD LIMIT 0.3–0.6 seconds. Fast weapons (~0.3), Medium (~0.45), Heavy/Slow (~0.6). NEVER exceed 0.6.
-  - `visual_stats`: Match the weapon's physical description in the Blueprint. 
+  - `visual_stats`: Match the weapon's physical description in the Blueprint.
     - e.g., A "Giant Hammer" should have a large `world_length` (e.g. 2.5) and a handle pivot (x=0.2).
+
+  ### Ranged Weapon Stats (weapon_type = "ranged" or uses payload_shoot_generic)
+  The blueprint's `chosen_projectile_id` defines which projectile is fired. Copy it into stats:
+  - `stats.projectile_id`: MUST equal the blueprint's `chosen_projectile_id`. (e.g. "projectile_bullet")
+  - `stats.projectile_count`: 1 (default), or more for multi-shot (e.g. 3 for burst, 5 for shotgun spread).
+  - `stats.spread_angle`: 0.0 for single/focused shot; 20–45 for spread/shotgun patterns.
+  - `stats.hit_start` and `stats.hit_end`: BOTH must be 0 (ranged weapons have no physical hitbox).
+  - `abilities.on_attack`: MUST be ["payload_shoot_generic"] — the engine reads projectile_id from stats at runtime.
+  - `abilities.on_hit`: Leave [] for pure ranged weapons (projectile handles its own on_hit payloads).
+
+  ### Melee Weapon Stats
+  - `stats.projectile_id`: Leave null (omit entirely).
+  - `abilities.on_attack`: Leave [] unless the weapon also fires a blade wave (sword qi).
+  - `abilities.on_hit`: Payload IDs for direct contact effects.
 
   ### Instructions for Structured Output
   Think step-by-step before finalizing the data:

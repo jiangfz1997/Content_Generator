@@ -90,6 +90,18 @@ class EngineDocsManager:
         await self._ensure_loaded()
         return self._sections.get("payload_catalog", await self.get_markdown_manual())
 
+    async def get_crafter_manual(self) -> str:
+        """Weapon Crafter: Weapon Schema + Projectile Schema only.
+        Payload selection is handled upstream by the designer's chosen_payload_ids.
+        Excludes Constitution, Tactical Manual, Payload Catalog — ~70% token reduction vs full manual."""
+        await self._ensure_loaded()
+        parts = [
+            self._sections.get("weapon_schema", ""),
+            self._sections.get("projectile", ""),
+        ]
+        result = "\n\n---\n\n".join(p for p in parts if p)
+        return result or await self.get_markdown_manual()
+
     # ------------------------------------------------------------------
     # Refresh (AI summarize + write to disk)
     # ------------------------------------------------------------------

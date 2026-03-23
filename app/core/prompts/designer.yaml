@@ -28,8 +28,39 @@ template: |
   Current Arsenal:
   {weapons}
   
+  ### Available Projectiles
+  Use `chosen_projectile_id` to pick one IF your design spawns a projectile (any weapon type can).
+  Leave None if no projectile is involved.
+  {available_projectiles}
+
   ### Instructions
-  Think step-by-step. First, analyze the Engine Rulebook to find the perfect payload for the biome and user request. Then, figure out how the provided materials justify this mechanic. Finally, output the final blueprint.
+  Think step-by-step:
+  1. Analyze the Engine Rulebook's Payload Catalog to find the best payload(s) for the biome and request.
+  2. Synthesize the provided materials (e.g., combining Poison and Shadow). How do they JUSTIFY the chosen payloads?
+  3. Decide `weapon_type`:
+     - `melee`: hitbox contact weapon. Base damage is `payload_strike` (auto-injected, you don't need to list it).
+       Add special effect payloads on top (e.g. DoT, knockback, slow).
+       A melee weapon CAN also spawn a projectile (e.g. sword qi) — add `payload_shoot_generic` and pick a `chosen_projectile_id`.
+     - `ranged`: fires a projectile. `payload_shoot_generic` is auto-injected — DO NOT add it manually.
+       Set `chosen_projectile_id` to the desired projectile. The projectile's on_hit defines the damage.
+       Only add extra special effect payloads (DoT, slow) if they trigger on the weapon itself.
+  4. Fill `chosen_payload_ids` with ONLY the special-effect payloads you are adding.
+     `payload_strike` (melee) and `payload_shoot_generic` (ranged) are auto-injected — do not list them.
+     - If `needs_new_payload: true`, include the new payload's ID here too.
+     - NEVER write an ID that is not in the catalog (unless it is your own new_payload_spec ID).
+  5. If any payload in `chosen_payload_ids` spawns a projectile, set `chosen_projectile_id` from the
+     Available Projectiles list above. Otherwise leave it None.
+
+  ### Projectile Factory Rules
+  - Evaluate existing projectiles first. If an existing projectile fits the visual and physical profile, use it.
+  - DO NOT COMPROMISE your design. If your concept requires a unique physical behavior (e.g., a homing missile, a boomerang blade, an orbital shield) that is missing from the list, you MUST set needs_new_projectile: true to invent it.
+  - Set `needs_new_projectile: true` ONLY if no existing projectile can express the required behavior
+    (e.g. homing bolt, bouncing blade, slow poison cloud, giant AoE orb).
+  - NEVER set `needs_new_projectile: true` to change only numeric values (speed, lifetime) — pick the
+    closest existing projectile and tune weapon stats instead.
+  - If `needs_new_projectile: true`, fill `new_projectile_spec` with id, description, speed_hint,
+    lifetime_hint, and on_hit_hint (list existing payload IDs for the on_hit effect).
+  - Set `chosen_projectile_id` to the new projectile's ID when `needs_new_projectile: true`.
 
   ### Payload Factory Rules
   - ALWAYS prefer existing payloads from the Engine Rulebook's Payload Catalog.

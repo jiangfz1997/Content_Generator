@@ -9,15 +9,15 @@ from app.core.config import settings
 from app.db.mongodb import db
 
 
-class PayloadsMongoService:
+class ProjectilesMongoService:
     def __init__(self):
-        self.collection_name = "payloads"
+        self.collection_name = "projectiles"
 
-    async def load_preset_payloads(self):
-        """Upsert all preset payloads (PAYLOADS_PRESET_PATH) into MongoDB as session_id='SYSTEM'."""
-        presets_dir = settings.PAYLOADS_PRESET_PATH
+    async def load_preset_projectiles(self):
+        """Upsert all preset projectiles (PROJECTILES_PRESET_PATH) into MongoDB as session_id='SYSTEM'."""
+        presets_dir = settings.PROJECTILES_PRESET_PATH
         if not presets_dir.exists():
-            print(f"⚠️ [PayloadSeeder] Preset dir not found: {presets_dir}")
+            print(f"⚠️ [ProjectileSeeder] Preset dir not found: {presets_dir}")
             return
 
         collection = db.db[self.collection_name]
@@ -42,26 +42,26 @@ class PayloadsMongoService:
 
         if ops:
             await collection.bulk_write(ops, ordered=False)
-            print(f"✅ [PayloadSeeder] 已同步 {len(ops)} 个预设 Payload。")
+            print(f"✅ [ProjectileSeeder] 已同步 {len(ops)} 个预设 Projectile。")
 
-    async def save_generated_payload(self, session_id: str, payload_data: dict):
-        """Persist a factory-generated payload bound to a specific session."""
+    async def save_generated_projectile(self, session_id: str, projectile_data: dict):
+        """Persist a factory-generated projectile bound to a specific session."""
         doc = {
-            "id": payload_data["id"],
+            "id": projectile_data["id"],
             "session_id": session_id,
             "is_preset": False,
-            "content": payload_data,
+            "content": projectile_data,
             "last_synced": datetime.utcnow(),
         }
         await db.db[self.collection_name].replace_one(
-            {"id": payload_data["id"], "session_id": session_id},
+            {"id": projectile_data["id"], "session_id": session_id},
             doc,
             upsert=True,
         )
-        print(f"✅ [PayloadService] 已存档: {payload_data['id']} (session={session_id})")
+        print(f"✅ [ProjectileService] 已存档: {projectile_data['id']} (session={session_id})")
 
-    async def get_all_payloads(self, session_id: Optional[str] = None) -> List[dict]:
-        """Return content dicts for SYSTEM presets + optional session-specific payloads."""
+    async def get_all_projectiles(self, session_id: Optional[str] = None) -> List[dict]:
+        """Return content dicts for SYSTEM presets + optional session-specific projectiles."""
         if session_id:
             query = {"$or": [{"session_id": "SYSTEM"}, {"session_id": session_id}]}
         else:
@@ -70,8 +70,8 @@ class PayloadsMongoService:
         docs = await cursor.to_list(length=500)
         return [d["content"] for d in docs]
 
-    async def get_session_payloads(self, session_id: str) -> List[dict]:
-        """Return only the generated payloads for a given session (for returning to Unity)."""
+    async def get_session_projectiles(self, session_id: str) -> List[dict]:
+        """Return only the generated projectiles for a given session (for returning to Unity)."""
         cursor = db.db[self.collection_name].find(
             {"session_id": session_id},
             {"_id": 0, "content": 1},
@@ -80,4 +80,4 @@ class PayloadsMongoService:
         return [d["content"] for d in docs]
 
 
-payload_mongo_service = PayloadsMongoService()
+projectile_mongo_service = ProjectilesMongoService()

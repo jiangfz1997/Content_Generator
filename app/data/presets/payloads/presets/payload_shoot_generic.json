@@ -1,0 +1,13 @@
+{
+  "id": "payload_shoot_generic",
+  "sequence": [
+    {
+      "primitive_id": "OP_SPAWN_PROJECTILE",
+      "params": {
+        "projectile_id": "@weapon.projectile_id",
+        "count": 1,
+        "spread_angle": 0.0
+      }
+    }
+  ]
+}

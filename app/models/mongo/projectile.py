@@ -2,11 +2,11 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-class PayloadDocument(BaseModel):
+class ProjectileDocument(BaseModel):
     id: str
     session_id: str = "SYSTEM"
     is_preset: bool = True
-    content: dict          # full payload JSON verbatim
+    content: dict          # full projectile JSON verbatim
     last_synced: datetime = Field(default_factory=datetime.utcnow)
 
     def to_mongo(self) -> dict:

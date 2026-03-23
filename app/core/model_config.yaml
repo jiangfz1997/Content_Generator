@@ -10,8 +10,9 @@ concept_reviewer: mini_model
 tech_auditor:     mini_model
 weapon_crafter:   model
 weapon_patcher:   model
-payload_factory:  model
-summarizer:       model
+payload_factory:      model
+projectile_factory:   model
+summarizer:           model
 
 ## GOOGLE ONLINE MODELS
 #designer:         google_flash_model

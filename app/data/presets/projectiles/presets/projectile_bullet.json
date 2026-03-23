@@ -1,0 +1,12 @@
+{
+  "id": "projectile_bullet",
+  "name": "Bullet",
+  "stats": {
+    "speed": 14.0,
+    "lifetime": 3.0,
+    "penetration": 0
+  },
+  "abilities": {
+    "on_hit": ["payload_bullet_hit"]
+  }
+}

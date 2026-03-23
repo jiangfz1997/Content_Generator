@@ -42,4 +42,6 @@ class GenerationRequest:
 class WeaponGenerateEvent:
     timestamp: int
     content: Dict[str, Any]          # 武器数据 (JObject)
-    new_payloads: Optional[List[Dict[str, Any]]] = None  # 本次新生成的 payload 定义列表，无则 null
+    new_payloads: Optional[List[Dict[str, Any]]] = None      # 本次新生成的 payload 定义列表，无则 null
+    new_projectiles: Optional[List[Dict[str, Any]]] = None   # 本次新生成的 projectile 定义列表，无则 null
+    icon_b64: Optional[str] = None                           # base64 PNG of the generated weapon icon

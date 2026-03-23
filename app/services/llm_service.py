@@ -29,9 +29,9 @@ class LLMService:
         google_flash_model = os.getenv("GOOGLE_FLASH_MODEL")
         google_api_key = os.getenv("GOOGLE_API_KEY")
         self.google_flash_model = ChatGoogleGenerativeAI(
-            model = google_flash_model,
-            api_key = google_api_key,
-            temperature = 0.7,
+            model=google_flash_model,
+            api_key=google_api_key,
+            temperature=0.7,
             max_retries=3,
             timeout=30,
         )

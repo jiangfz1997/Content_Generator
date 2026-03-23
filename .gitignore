@@ -6,3 +6,7 @@ __pycache__
 *.pyd
 data/mongo_db/
 *.meta
+logs/
+app/data/sessions/
+tests/
+Docs/

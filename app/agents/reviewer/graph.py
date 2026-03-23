@@ -1,37 +1,55 @@
 import json
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional
 from app.core.state import GlobalState  # 你的状态定义
 from app.core.config import settings
-from langchain_core.prompts import ChatPromptTemplate, load_prompt
+from langchain_core.prompts import load_prompt
 from app.services.llm_service import llm_service
 
 # 🌟 引入新的极简文档管理器和控制台回调
 from app.services.engine_docs_manager import engine_docs_manager
 from app.services.mongo_service.weapon_services import weapon_mongo_service
-from app.utils.callbacks import AgentConsoleCallback
+from app.utils.callbacks import make_callbacks
 
 
 # --- Pydantic Schemas ---
 class IdeaReviewResult(BaseModel):
     # 🧠 CoT 思考前置
-    concept_analysis: str = Field(
-        description="STEP 1: Briefly analyze if the concept fits the biome and materials. (Under 20 words)")
+    concept_analysis: Optional[str] = Field(
+        default="",
+        description="STEP 1: Briefly analyze if the concept fits the biome and materials. MAX 15 words.")
 
     is_idea_passed: bool = Field(description="True if creative and fits biome. False if generic.")
     idea_feedback: str = Field(description="Constructive feedback for the Planner.")
 
+    @field_validator("concept_analysis", mode="before")
+    @classmethod
+    def truncate_concept_analysis(cls, v):
+        if isinstance(v, str) and len(v) > 200:
+            return v[:200]
+        return v or ""
+
 
 class TechAuditResult(BaseModel):
-    # 🧠 CoT 思考前置：强迫它先去查手册对账
-    manual_compliance_check: str = Field(
-        description="STEP 1: Verify if the weapon's payloads and motions EXACTLY exist in the Engine Manual. (Under 20 words)")
-    balance_analysis: str = Field(
-        description="STEP 2: Analyze if the stats are balanced for the given level. (Under 20 words)")
+    # 🧠 CoT 思考前置 — Optional，防止 token 溢出导致后续关键字段丢失
+    manual_compliance_check: Optional[str] = Field(
+        default="",
+        description="STEP 1: Are the payload IDs valid? Are motions valid? MAX 15 words.")
+    balance_analysis: Optional[str] = Field(
+        default="",
+        description="STEP 2: Are the stats balanced for this level? MAX 15 words.")
 
     is_final_passed: bool = Field(
         description="True if stats are balanced, payloads are valid, and it matches the concept.")
     tech_feedback: str = Field(
         description="If False, give exact instructions on what fields to fix. If True, write 'None'.")
+
+    @field_validator("manual_compliance_check", "balance_analysis", mode="before")
+    @classmethod
+    def truncate_cot_fields(cls, v):
+        if isinstance(v, str) and len(v) > 200:
+            return v[:200]
+        return v or ""
 
 # --- Agent Class ---
 class ReviewerAgent:
@@ -63,7 +81,7 @@ class ReviewerAgent:
                 "materials": materials_dump,
                 "concept": state.get("design_concept", "")
             },
-            config={"callbacks": [AgentConsoleCallback(agent_name="IdeaAuditor")]}
+            config={"callbacks": make_callbacks("IdeaAuditor", state.get("session_id", "default"))}
         )
 
 
@@ -79,7 +97,9 @@ class ReviewerAgent:
 
     # ==========================================
     # 节点 2：技术终审 (接在 Weapon Designer 之后)
+    # Currently not used in the pipeline
     # ==========================================
+
     async def tech_audit_node(self, state: GlobalState):
         attempts = state.get("audit_attempts", 0)
         strictness = "MAXIMUM (Strictly follow manual)"
@@ -105,7 +125,7 @@ class ReviewerAgent:
             "engine_manual": engine_manual_md,
             "strictness_level": strictness,
         },
-            config={"callbacks": [AgentConsoleCallback(agent_name="TechAuditor")]})
+            config={"callbacks": make_callbacks("TechAuditor", state.get("session_id", "default"))})
 
         color = "\033[92m" if result.is_final_passed else "\033[91m"
         print(f"{color}[Tech Audit] Passed: {result.is_final_passed} | Feedback: {result.tech_feedback}\033[0m")
@@ -118,6 +138,16 @@ class ReviewerAgent:
                 biome=state.get("biome"),
                 level=state.get("level"),
             )
+            # Local backup
+            import json
+            try:
+                backup_dir = settings.SESSIONS_DIR / session_id / "weapons"
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup_path = backup_dir / f"{final_weapon_data.get('id', 'unknown')}.json"
+                with open(backup_path, "w", encoding="utf-8") as f:
+                    json.dump(final_weapon_data, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                print(f"⚠️ [Reviewer] 武器本地备份失败 (不影响流程): {e}")
 
         return {
             "is_final_passed": result.is_final_passed,

@@ -31,7 +31,9 @@ class GlobalState(TypedDict):
     reference_weapons: Optional[List[Dict[str, Any]]]  # all weapon summaries (for ID uniqueness)
     similar_weapons: Optional[List[Dict[str, Any]]]    # same-biome weapons sorted by level proximity
     pending_payload_ids: Optional[List[str]]            # IDs of newly factory-generated payloads
-    generated_icon: Optional[str]                      # icon filename produced by artist_node
+    pending_projectile_ids: Optional[List[str]]         # IDs of newly factory-generated projectiles
+    generated_icon: Optional[str]                      # icon file path produced by artist_node
+    generated_icon_b64: Optional[str]                  # base64-encoded PNG for direct WebSocket delivery
     payload_valid: Optional[bool]                      # set by payload_validator_node (code, not LLM)
     world_level: Optional[int]                         # global difficulty from Unity, used for power budget
     power_score: Optional[float]                       # computed by WeaponEvaluator after generation

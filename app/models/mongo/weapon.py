@@ -12,7 +12,7 @@ class WeaponContent(BaseModel):
 
 class WeaponDocument(BaseModel):
     id: str = Field(..., description="weapon's  unique ID")
-    session_id: str = Field(default="SYSTEM", description="session ID, system means it's a preset weapon not generated from a specific session")
+    session_id: str = Field(default="SYSTEM", description="session ID, system means it's a presets weapon not generated from a specific session")
     is_preset: bool = True
     content: WeaponContent
     last_synced: datetime = Field(default_factory=datetime.utcnow)

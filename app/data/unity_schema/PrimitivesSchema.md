@@ -1,5 +1,5 @@
 # Primitives API (Logic & Physics)
-> Generated on: 2026-03-15 20:06:48
+> Generated on: 2026-03-17 18:31:34
 > Total entries: 5
 
 ## `OP_APPLY_FORCE`
@@ -45,9 +45,9 @@
 ### Parameters
 | Param | Type | Description |
 | :--- | :--- | :--- |
-| `projectile_id` | `string` | ID of the projectile definition in ProjectileDatabase (e.g. 'projectile_bullet'). |
-| `count` | `int` | Number of projectiles to fire simultaneously. Default 1. |
-| `spread_angle` | `float` | Total spread angle in degrees when count > 1. E.g. 30 means projectiles fan out over a 30-degree arc. Default 0. |
+| `projectile_id` | `string` | ID of the projectile definition in ProjectileDatabase (e.g. 'projectile_bullet'). Use '@weapon.projectile_id' to read from the weapon's stats at runtime — required for payload_shoot_generic which is shared across all ranged weapons. |
+| `count` | `int` | Number of projectiles to fire simultaneously. Default 1. Overridden by ctx.ProjectileCount when projectile_id is '@weapon.projectile_id'. |
+| `spread_angle` | `float` | Total spread angle in degrees when count > 1. E.g. 30 = fan across 30 degrees. Default 0. Overridden by ctx.SpreadAngle when projectile_id is '@weapon.projectile_id'. |
 
 ---
 ## `OP_TIMER`

@@ -8,7 +8,8 @@ from app.services.llm_service import llm_service
 from app.services.primitive_registry import primitive_registry
 from app.core.config import settings
 from app.models.schemas import WeaponSchema, WeaponPatchSchema, apply_weapon_patch
-from app.utils.callbacks import AgentConsoleCallback
+from app.agents.designer.graph import _slim_weapon
+from app.utils.callbacks import make_callbacks
 from app.utils.inject_prompts import inject_prompts
 
 
@@ -68,11 +69,7 @@ Output ONLY the fields that need to change."""),
         #     available_primitives=self.fresh_primitives,
         #     available_motions=self.fresh_motions,
         # )
-        if state.get("engine_manual"):
-            engine_manual_md = state["engine_manual"]
-        else:
-            engine_manual_md = await engine_docs_manager.get_markdown_manual()
-            state["engine_manual"] = engine_manual_md
+        crafter_manual = await engine_docs_manager.get_crafter_manual()
 
         history = state.get("generation_history", [])[-20:]
         history_str = "\n".join([f"- {w['weapon_id']}" for w in history]) if history else "No weapons created yet."
@@ -81,9 +78,25 @@ Output ONLY the fields that need to change."""),
         keywords = concept.get("keywords", [])
         keywords_str = ", ".join(keywords) if keywords else "none specified"
 
-        all_payloads = primitive_registry.get_all_payloads()
-        available_payloads_str = "\n".join(
-            f"- {pid}: {p.get('description', '')}" for pid, p in sorted(all_payloads.items())
+        # Payload IDs resolved by the designer — passed as hard constraint
+        chosen_ids = concept.get("chosen_payload_ids") or []
+        if chosen_ids:
+            all_payloads = primitive_registry.get_all_payloads()
+            chosen_payloads_str = "\n".join(
+                f"- {pid}: {all_payloads.get(pid, {}).get('description', '(engine built-in)') if pid != 'payload_shoot_generic' else '(engine built-in) fires projectile_id from stats'}"
+                for pid in chosen_ids
+            )
+        else:
+            chosen_payloads_str = "(none specified — choose from the engine manual)"
+
+        # Projectile context for ranged weapons
+        chosen_projectile_id = concept.get("chosen_projectile_id")
+        projectile_hint = (
+            f"This weapon fires projectile: **{chosen_projectile_id}**. "
+            f"Set stats.projectile_id = \"{chosen_projectile_id}\". "
+            f"Set stats.hit_start = 0, stats.hit_end = 0."
+            if chosen_projectile_id else
+            "Melee weapon — no projectile. Leave stats.projectile_id null."
         )
 
         try:
@@ -91,18 +104,31 @@ Output ONLY the fields that need to change."""),
                 "biome": state["biome"],
                 "level": state["level"],
                 "materials": state["materials"],
-                "weapons": state["weapons"],
+                "weapons": [
+                    _slim_weapon(w) for w in (state.get("weapons") or [])
+                ],
                 "concept": concept,
                 "keywords": keywords_str,
                 "feedback": state.get("tech_feedback", "None"),
-                "engine_manual": engine_manual_md,
+                "crafter_manual": crafter_manual,
+                "chosen_payload_ids": chosen_payloads_str,
                 "past_weapons": history_str,
-                "available_payloads": available_payloads_str,
+                "projectile_hint": projectile_hint,
             },
-                config={"callbacks": [AgentConsoleCallback(agent_name="WeaponAgent")]})
+                config={"callbacks": make_callbacks("WeaponAgent", state.get("session_id", "default"))})
 
 
-            return {"final_output": weapon_obj.model_dump(), "generation_history": state.get("generation_history", [])}
+            weapon_dict = weapon_obj.model_dump()
+
+            # Hard-override: designer's chosen_projectile_id is the source of truth.
+            # Never trust the LLM to copy it correctly into stats.projectile_id.
+            if chosen_projectile_id:
+                weapon_dict.setdefault("stats", {})["projectile_id"] = chosen_projectile_id
+                weapon_dict["stats"]["hit_start"] = 0.0
+                weapon_dict["stats"]["hit_end"] = 0.0
+                print(f"[CraftingNode] Overrode stats.projectile_id → {chosen_projectile_id}")
+
+            return {"final_output": weapon_dict, "generation_history": state.get("generation_history", [])}
         except Exception as e:
             err_msg = f"[Crafting Node] {e}"
             print(err_msg)
@@ -131,9 +157,18 @@ Output ONLY the fields that need to change."""),
                     "biome": state.get("biome", "Unknown"),
                     "level": state.get("level", 1),
                 },
-                config={"callbacks": [AgentConsoleCallback(agent_name="WeaponPatcher")]},
+                config={"callbacks": make_callbacks("WeaponPatcher", state.get("session_id", "default"))},
             )
             patched_weapon = apply_weapon_patch(original_weapon, patch_result)
+
+            # Re-apply projectile_id override in case patcher stomped it
+            concept = state.get("design_concept") or {}
+            proj_id = concept.get("chosen_projectile_id")
+            if proj_id:
+                patched_weapon.setdefault("stats", {})["projectile_id"] = proj_id
+                patched_weapon["stats"]["hit_start"] = 0.0
+                patched_weapon["stats"]["hit_end"] = 0.0
+
             print(f"[PatchNode] 修复完成: {patch_result.patch_analysis}")
             return {"final_output": patched_weapon}
         except Exception as e:

@@ -10,11 +10,13 @@ Each file describes one weapon and is loaded by `WeaponDatabase` at startup.
 
 ```json
 {
-  "id":      "weapon_pistol",
-  "name":    "Pistol",
-  "stats":   { ... },
-  "motions": [ ... ],
-  "abilities": { ... }
+  "id":           "weapon_pistol",
+  "name":         "Pistol",
+  "icon":         "weapon_pistol.png",
+  "stats":        { ... },
+  "visual_stats": { ... },
+  "motions":      [ ... ],
+  "abilities":    { ... }
 }
 ```
 
@@ -22,7 +24,9 @@ Each file describes one weapon and is loaded by `WeaponDatabase` at startup.
 | :--- | :--- | :--- |
 | `id` | `string` | Unique identifier. Must match the filename (e.g. `weapon_pistol.json` → `"weapon_pistol"`). |
 | `name` | `string` | Display name shown in UI. |
+| `icon` | `string` | Sprite filename inside `Resources/Weapons/`. Defaults to `"{id}.png"` if omitted. |
 | `stats` | `object` | Numeric parameters controlling timing, range, and base power. See table below. |
+| `visual_stats` | `object` | Visual sizing and pivot configuration. See table below. |
 | `motions` | `array` | List of motion primitives that animate the weapon during an attack. See **MotionPrimitivesSchema.md**. |
 | `abilities` | `object` | Maps trigger keys to lists of payload IDs. See **Abilities** section below. |
 
@@ -39,6 +43,9 @@ Each file describes one weapon and is loaded by `WeaponDatabase` at startup.
 | `design_level` | `int` | `1` | The player level this weapon is balanced for. A player at exactly `design_level` will deal exactly `base_damage`. Below → weaker, above → stronger. |
 | `hit_start` | `float` | `0.2` | Normalized time [0, 1] when the hitbox collider is enabled. Use `0` for ranged weapons that never use the physical collider. |
 | `hit_end` | `float` | `0.8` | Normalized time [0, 1] when the hitbox collider is disabled. Use `0` (same as `hit_start`) for ranged weapons. |
+| `projectile_id` | `string` | `""` | **Ranged only.** ID of the projectile to fire (e.g. `"projectile_bullet"`). Must match an entry in `ProjectileDatabase`. Leave empty or omit for melee weapons. |
+| `projectile_count` | `int` | `1` | **Ranged only.** Number of projectiles fired per attack. `1` = pistol, `5` = shotgun. |
+| `spread_angle` | `float` | `0.0` | **Ranged only.** Total spread in degrees when `projectile_count > 1`. E.g. `30` fans projectiles across a 30° arc. Ignored when `projectile_count` is `1`. |
 
 ### Damage Scaling Reference
 
@@ -53,14 +60,23 @@ Each file describes one weapon and is loaded by `WeaponDatabase` at startup.
 
 ---
 
+## `visual_stats` Fields
+
+| Field | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `world_length` | `float` | `1.0` | **Currently not read by code** — `WeaponInstance._targetWorldLength` is hardcoded to `1.0`. Reserved for future use. Intended to set the weapon sprite's longest dimension in world units via `ApplySizeNormalization`. |
+| `pivot` | `object {x, y}` | `{x:0.5, y:0.0}` | The sprite's pivot point in normalized coordinates used when loading the sprite. Controls the rotation anchor. `x=0` is the left/handle end, `x=1` is the tip. Typical values: `{x:0.1, y:0}` for a grip-pivoting sword. |
+
+---
+
 ## `abilities` Fields
 
 Maps **trigger keys** to ordered lists of payload IDs. Each payload is defined separately in `Assets/StreamingAssets/Config/Payloads/*.json`.
 
 ```json
 "abilities": {
-  "on_hit":    ["payload_fire_burn"],
-  "on_attack": ["payload_shoot_bullet"],
+  "on_hit":    ["payload_strike"],
+  "on_attack": ["payload_shoot_generic"],
   "on_equip":  []
 }
 ```
@@ -100,7 +116,7 @@ Maps **trigger keys** to ordered lists of payload IDs. Each payload is defined s
     { "primitive_id": "OP_MOVE",   "params": { "start": {"x":0,"y":0}, "end": {"x":0.5,"y":0}, "curve": "PingPong" } }
   ],
   "abilities": {
-    "on_hit":    ["payload_fire_burn"],
+    "on_hit":    ["payload_strike"],
     "on_attack": [],
     "on_equip":  []
   }
@@ -120,14 +136,17 @@ Maps **trigger keys** to ordered lists of payload IDs. Each payload is defined s
     "base_damage": 15,
     "design_level": 3,
     "hit_start": 0,
-    "hit_end": 0
+    "hit_end": 0,
+    "projectile_id": "projectile_bullet",
+    "projectile_count": 1,
+    "spread_angle": 0.0
   },
   "motions": [
     { "primitive_id": "OP_MOVE", "params": { "start": {"x":0,"y":0}, "end": {"x":-0.3,"y":0}, "curve": "EaseOut" } }
   ],
   "abilities": {
     "on_hit":    [],
-    "on_attack": ["payload_shoot_bullet"],
+    "on_attack": ["payload_shoot_generic"],
     "on_equip":  []
   }
 }

@@ -1,0 +1,76 @@
+{
+  "action": "generate_weapon",
+  "biome": "Magma_Chamber",
+  "player_level": 20,
+  "prompt": null,
+  "materials": [
+    {
+      "id": "mat_poison_essence",
+      "itemName": "Poison Essence",
+      "icon": {
+        "instanceID": 82676
+      },
+      "maxStack": 99,
+      "itemType": 1,
+      "description": "A stone stores the power of poison.",
+      "count_in_altar": 1
+    },
+    {
+      "id": "mat_shadow_essence",
+      "itemName": "Shadow Essence",
+      "icon": {
+        "instanceID": 82708
+      },
+      "maxStack": 99,
+      "itemType": 1,
+      "description": "A stone stores the power of shadow.",
+      "count_in_altar": 1
+    }
+  ],
+  "weapons": [
+    {
+      "id": "weapon_axe",
+      "name": "Mjolnir Prototype",
+      "stats": {
+        "range": 1.5,
+        "duration": 0.4,
+        "cooldown": 0.4
+      },
+      "motions": [
+        {
+          "primitive_id": "OP_ROTATE",
+          "params": {
+            "start": 90.0,
+            "end": -90.0,
+            "curve": "EaseIn"
+          }
+        },
+        {
+          "primitive_id": "OP_MOVE",
+          "params": {
+            "start": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "end": {
+              "x": 0.5,
+              "y": 0.0
+            },
+            "curve": "PingPong"
+          }
+        }
+      ],
+      "abilities": {
+        "on_hit": [
+          "payload_strike",
+          "payload_knockback"
+        ],
+        "on_attack": [],
+        "on_equip": []
+      },
+      "icon": "weapon_axe.png"
+    }
+  ],
+  "session_id": "e59f732f-9c4c-44a0-8c33-db06e1930669",
+  "world_level": 1
+}

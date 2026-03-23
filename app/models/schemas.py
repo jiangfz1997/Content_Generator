@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Dict, Any, Optional
 
 from app.models.common_types import Vector2
@@ -12,15 +12,20 @@ class WeaponStats(BaseModel):
     duration: float = Field(description="Total attack animation duration in seconds. MUST be 0.3–0.6.")
     cooldown: float = Field(description="Minimum seconds between attacks.")
 
-    # ！
     @field_validator("duration")
     @classmethod
     def clamp_duration(cls, v: float) -> float:
         return max(0.3, min(0.6, v))
+
     base_damage: float = Field(description="Raw damage output at design_level. Scaling formula: final = base_damage × √(player_level / design_level).")
     design_level: int = Field(description="Player level this weapon is balanced for. Suggested base_damage: Lv1→10-14, Lv5→18-22, Lv10→28-35.")
     hit_start: float = Field(description="Normalized time [0,1] when hitbox collider activates. Use 0 for ranged weapons (no physical hitbox).")
     hit_end: float = Field(description="Normalized time [0,1] when hitbox collider deactivates. Use 0 (same as hit_start) for ranged weapons.")
+
+    # Ranged weapon parameters — null/default for melee
+    projectile_id: Optional[str] = Field(default=None, description="If ranged, projectile to fire (e.g. 'projectile_bullet'). Null for melee.")
+    projectile_count: int = Field(default=1, description="Number of projectiles per attack. 1=pistol, 5=shotgun.")
+    spread_angle: float = Field(default=0.0, description="Total spread in degrees when count > 1. E.g. 30 = fan across 30°.")
 
 class VisualStats(BaseModel):
     world_length: float = Field(description="武器在世界空间中的视觉长度，例如匕首0.8，长矛3.0")
@@ -52,16 +57,6 @@ class Abilities(BaseModel):
         description="Atomic Payload IDs that activate once when the weapon is equipped. MAX 2. Best suited for self-buffs (haste) or persistent costs (sacrifice). If no passive equip effects, return []."
     )
 
-    @model_validator(mode="after")
-    def warn_invalid_payload_ids(self):
-        """Log invalid IDs but keep them — payload_validator_node handles routing."""
-        from app.services.primitive_registry import primitive_registry
-        known = set(primitive_registry.get_all_payloads().keys())
-        all_ids = self.on_hit + self.on_attack + self.on_equip
-        invalid = [pid for pid in all_ids if pid and pid not in known]
-        if invalid:
-            print(f"[Abilities] ⚠️ Invalid payload IDs detected (will be caught by payload_validator): {invalid}")
-        return self
 
 class WeaponSchema(BaseModel):
 
