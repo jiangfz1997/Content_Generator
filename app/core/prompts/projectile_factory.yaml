@@ -18,6 +18,9 @@ template: |
   - Lifetime hint : {lifetime_hint} seconds
   - On-hit hint   : {on_hit_hint}
 
+  ### Animation Presets (choose exactly one)
+  {animation_catalog}
+
   ### STRICT RULES
 
   1. `id` MUST start with `projectile_` and match the requested Projectile ID exactly.
@@ -30,9 +33,13 @@ template: |
      - `speed`: fast projectile ≈ 18–22, normal ≈ 12–16, slow/arc ≈ 6–10
      - `lifetime`: short-range ≈ 1.0–2.0s, normal ≈ 2.5–3.5s, long-range ≈ 4.0–6.0s
      - `penetration`: 0 = stops on first hit (default), 99 = passes through all enemies
-     - `collider_radius`: omit for normal projectiles (default 0.1); use 1.0–3.0 for AoE splash
+     - `collider_radius`: explosion detection radius — set ONLY for explosive/AoE projectiles (1.5–3.0).
+       Leave null for all normal projectiles (bullet, arrow, bolt, orb); they hit single targets on contact.
 
-  4. Output `reasoning` FIRST (MAX 20 words) — explain your stat and payload choices briefly.
+  4. `animation_preset` MUST be one of the preset names listed above. Match by shape first,
+     then by elemental theme. NEVER invent a preset name.
+
+  5. Output `reasoning` FIRST (MAX 20 words) — explain your stat, payload, and animation choices.
 input_variables:
   - projectile_id
   - description
@@ -40,3 +47,4 @@ input_variables:
   - lifetime_hint
   - on_hit_hint
   - payload_catalog
+  - animation_catalog

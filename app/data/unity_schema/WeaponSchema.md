@@ -66,6 +66,8 @@ Each file describes one weapon and is loaded by `WeaponDatabase` at startup.
 | :--- | :--- | :--- | :--- |
 | `world_length` | `float` | `1.0` | **Currently not read by code** — `WeaponInstance._targetWorldLength` is hardcoded to `1.0`. Reserved for future use. Intended to set the weapon sprite's longest dimension in world units via `ApplySizeNormalization`. |
 | `pivot` | `object {x, y}` | `{x:0.5, y:0.0}` | The sprite's pivot point in normalized coordinates used when loading the sprite. Controls the rotation anchor. `x=0` is the left/handle end, `x=1` is the tip. Typical values: `{x:0.1, y:0}` for a grip-pivoting sword. |
+| `scale` | `float` | `1.0` | Uniform sprite scale multiplier. Unity reads this to proportionally resize the weapon object. `1.0` = default size. Small/light (dagger, wand): `0.7–0.9`. Normal (sword, axe): `1.0`. Large/heavy (greatsword, hammer, spear): `1.2–1.5`. |
+| `tint_color` | `object {r,g,b,a}` | `{1,1,1,1}` | RGBA tint applied to the weapon sprite at runtime (0.0–1.0 per channel). Used in composite artist mode. |
 
 ---
 
@@ -142,7 +144,7 @@ Maps **trigger keys** to ordered lists of payload IDs. Each payload is defined s
     "spread_angle": 0.0
   },
   "motions": [
-    { "primitive_id": "OP_MOVE", "params": { "start": {"x":0,"y":0}, "end": {"x":-0.3,"y":0}, "curve": "EaseOut" } }
+    { "primitive_id": "OP_ROTATE", "params": { "start": 0, "end": -15, "curve": "EaseOut" } }
   ],
   "abilities": {
     "on_hit":    [],
@@ -150,4 +152,13 @@ Maps **trigger keys** to ordered lists of payload IDs. Each payload is defined s
     "on_equip":  []
   }
 }
+```
+
+> **Motion design note — ranged weapons:**
+> Design motions based on the weapon's physical nature, NOT just the fact that it fires a projectile.
+> - **Firearms** (pistol, rifle, shotgun, cannon): a backward `OP_MOVE` (e.g. `end: {x:-0.3,y:0}`) is appropriate to simulate recoil.
+> - **Bows / crossbows**: a slight pull-back then snap forward (`OP_MOVE` + `EaseIn`/`EaseOut`), or a small rotate.
+> - **Wands / staves / magic weapons**: a gentle thrust forward (`OP_MOVE end: {x:0.2,y:0}`) or a rotate. No backward recoil.
+> - **Thrown weapons**: a forward throw motion (`OP_MOVE end: {x:0.3,y:0.1}`).
+> Never add a recoil (negative x move) to a wand, bow, or magic weapon.
 ```

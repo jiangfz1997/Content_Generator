@@ -37,3 +37,6 @@ class GlobalState(TypedDict):
     payload_valid: Optional[bool]                      # set by payload_validator_node (code, not LLM)
     world_level: Optional[int]                         # global difficulty from Unity, used for power budget
     power_score: Optional[float]                       # computed by WeaponEvaluator after generation
+    is_cache_hit: Optional[bool]                       # True if weapon was found in DB by combination match
+    is_input_cache_hit: Optional[bool]                 # True if weapon was found by input hash (pre-designer)
+    input_hash: Optional[str]                          # md5 of materials+weapons+biome, set by input_cache_node

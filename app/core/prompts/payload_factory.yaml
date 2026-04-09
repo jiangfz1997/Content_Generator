@@ -36,7 +36,7 @@ template: |
 
   3. OP_APPLY_FORCE params:
      - magnitude: float (positive = push away, negative = pull toward)
-     - direction_mode: "HitNormal" | "SourceForward" | "FromHitPoint" | "SourceToTarget"
+     - direction_mode: "HitNormal" | "SourceForward" | "FromHitPoint" | "SourceToTarget" | "FromColliderCenter" (use for explosions/AoE)
      - target_type: "self" or "target"
      - override_duration: float (seconds target AI is stunned, e.g. 0.25)
 
@@ -67,7 +67,9 @@ template: |
        NEVER write {{"primitive_id": "OP_MODIFY_HP", "params": null}} — params MUST contain the actual values.
 
   6. OP_SPAWN_PROJECTILE params:
-     - projectile_id: string (must reference an existing entry in ProjectileDatabase)
+     - projectile_id: MUST always be the string "@weapon.projectile_id" — the actual projectile
+       is chosen by the designer at the weapon level and resolved at runtime. NEVER hardcode a
+       specific projectile ID here.
      - count: int (default 1)
      - spread_angle: float (degrees, default 0)
 

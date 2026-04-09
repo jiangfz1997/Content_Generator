@@ -7,6 +7,6 @@
     "penetration": 0
   },
   "abilities": {
-    "on_hit": ["payload_bullet_hit"]
+    "on_hit": ["payload_strike"]
   }
 }

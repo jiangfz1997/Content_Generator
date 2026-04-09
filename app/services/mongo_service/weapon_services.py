@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 from typing import List, Optional
@@ -41,14 +42,35 @@ class WeaponMongoService:
                     )
                     operations.append(op)
                 except Exception as e:
-                    print(f"❌ [Seeder] 数据校验失败 {filename}: {e}")
+                    print(f"❌ [Seeder] validation failed for {filename}: {e}")
 
         if operations:
             await collection.bulk_write(operations, ordered=False)
-            print(f"✅ [Seeder] 已同步 {len(operations)} 把武器。")
+            print(f"✅ [Seeder] synced {len(operations)} weapons")
+
+    async def find_by_input_hash(self, input_hash: str, session_id: str) -> Optional[dict]:
+        """Find a previously generated weapon by its input combination hash, scoped to session."""
+        doc = await db.db[self.collection_name].find_one(
+            {"input_hash": input_hash, "is_preset": False, "session_id": session_id},
+            {"_id": 0, "content": 1},
+        )
+        return doc.get("content") if doc else None
+
+    @staticmethod
+    def _make_combination_hash(biome: str, payload_ids: List[str], projectile_id: Optional[str]) -> str:
+        key = json.dumps({
+            "biome": biome or "",
+            "payloads": sorted(pid for pid in payload_ids if pid),
+            "projectile_id": projectile_id or "",
+        }, sort_keys=True)
+        return hashlib.md5(key.encode()).hexdigest()
 
     async def save_generated_weapon(self, weapon_data: dict, session_id: str,
-                                    biome: str = None, level: int = None):
+                                    biome: str = None, level: int = None,
+                                    generation_time_secs: float = None,
+                                    node_timings: dict = None,
+                                    node_traces: dict = None,
+                                    input_hash: str = None):
         """保存 AI 生成的武器，并绑定 session_id 及 RAG 元数据"""
         try:
             if not weapon_data:
@@ -58,7 +80,10 @@ class WeaponMongoService:
             on_hit = abilities.get("on_hit") or []
             on_attack = abilities.get("on_attack") or []
             on_equip = abilities.get("on_equip") or []
-            primary_payload = (on_hit or on_attack or on_equip or [None])[0]
+            all_payload_ids = [p for p in on_hit + on_attack + on_equip if p]
+            primary_payload = all_payload_ids[0] if all_payload_ids else None
+            projectile_id = (weapon_data.get("stats") or {}).get("projectile_id")
+            combination_hash = self._make_combination_hash(biome, all_payload_ids, projectile_id) if biome else None
 
             doc = WeaponDocument(
                 id=weapon_data["id"],
@@ -69,16 +94,21 @@ class WeaponMongoService:
                 level=level,
                 primary_payload=primary_payload,
                 summary=weapon_data.get("summary"),
+                generation_time_secs=round(generation_time_secs, 2) if generation_time_secs else None,
+                node_timings=node_timings or None,
+                node_traces=node_traces or None,
+                input_hash=input_hash or None,
+                combination_hash=combination_hash,
             )
             await db.db[self.collection_name].replace_one(
                 {"id": doc.id, "session_id": session_id},
                 doc.to_mongo(),
                 upsert=True
             )
-            print(f"✅ [Service] 武器已存档: {doc.id}")
+            print(f"✅ [Service] weapon saved: {doc.id}")
             return True
         except Exception as e:
-            print(f"❌ [Service] 保存 AI 武器失败: {e}")
+            print(f"❌ [Service] failed to save weapon: {e}")
             return False
 
     async def get_similar_weapons(self, biome: str, level: int, limit: int = 6) -> List[dict]:
@@ -93,7 +123,6 @@ class WeaponMongoService:
         cursor = db.db[self.collection_name].find({"biome": biome}, projection)
         docs = await cursor.to_list(length=200)
 
-        # Python 侧按 level 距离排序（DB 数量小，不值得 aggregation）
         docs.sort(key=lambda d: abs((d.get("level") or 0) - level))
 
         result = []
@@ -103,6 +132,24 @@ class WeaponMongoService:
             d["abilities"] = content.get("abilities", {})
             result.append(d)
         return result
+
+    async def find_by_combination(
+        self,
+        biome: str,
+        payload_ids: List[str],
+        projectile_id: Optional[str],
+        session_id: str = None,
+    ) -> Optional[dict]:
+        """
+        Find an existing weapon by combination_hash (sorted payload_ids + projectile_id + biome),
+        scoped to session.  Returns the full content dict or None.
+        """
+        combo_hash = self._make_combination_hash(biome, payload_ids, projectile_id)
+        query = {"combination_hash": combo_hash, "is_preset": False}
+        if session_id:
+            query["session_id"] = session_id
+        doc = await db.db[self.collection_name].find_one(query, {"_id": 0, "content": 1})
+        return doc.get("content") if doc else None
 
     async def get_all_summaries(self) -> List[dict]:
         """拉取所有武器的轻量摘要，用于 RAG 注入 designer prompt"""
@@ -116,6 +163,28 @@ class WeaponMongoService:
         for d in docs:
             d["name"] = d.pop("content", {}).get("name", d.get("id"))
         return docs
+
+    async def get_all_sessions(self) -> List[dict]:
+        """返回所有非 SYSTEM session 的摘要（id + 武器数 + 最后生成时间）"""
+        pipeline = [
+            {"$match": {"session_id": {"$ne": "SYSTEM"}}},
+            {"$group": {
+                "_id":        "$session_id",
+                "weapon_count": {"$sum": 1},
+                "last_created": {"$max": "$last_synced"},
+            }},
+            {"$sort": {"last_created": -1}},
+        ]
+        docs = await db.db[self.collection_name].aggregate(pipeline).to_list(length=500)
+        return [{"session_id": d["_id"], "weapon_count": d["weapon_count"],
+                 "last_created": d["last_created"].isoformat() if d["last_created"] else None}
+                for d in docs]
+
+    async def get_weapons_by_session(self, session_id: str) -> List[dict]:
+        """返回指定 session 下所有武器的完整文档（含 generation_time_secs）"""
+        projection = {"_id": 0}
+        cursor = db.db[self.collection_name].find({"session_id": session_id}, projection)
+        return await cursor.to_list(length=500)
 
     async def get_weapons_for_game(self, session_id: str) -> List[dict]:
         """

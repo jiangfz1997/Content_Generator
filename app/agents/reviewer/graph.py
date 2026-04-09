@@ -4,6 +4,7 @@ from typing import Optional
 from app.core.state import GlobalState  # 你的状态定义
 from app.core.config import settings
 from langchain_core.prompts import load_prompt
+from langchain_core.runnables import RunnableConfig
 from app.services.llm_service import llm_service
 
 # 🌟 引入新的极简文档管理器和控制台回调
@@ -62,8 +63,8 @@ class ReviewerAgent:
         self.tech_prompt = load_prompt(str(tech_prompt_path), encoding=settings.ENCODING)
 
         # 2. 绑定两套不同的结构化输出
-        self.idea_llm = llm_service.get_model("concept_reviewer").with_structured_output(IdeaReviewResult)
-        self.tech_llm = llm_service.get_model("tech_auditor").with_structured_output(TechAuditResult)
+        self.idea_llm = llm_service.get_structured_model("concept_reviewer", IdeaReviewResult)
+        self.tech_llm = llm_service.get_structured_model("tech_auditor", TechAuditResult)
 
         # 3. 组装两条独立的 Chain
         self.idea_chain = self.idea_prompt | self.idea_llm
@@ -72,16 +73,19 @@ class ReviewerAgent:
     # ==========================================
     # 节点 1：创意审核 (接在 Planner 之后)
     # ==========================================
-    async def idea_audit_node(self, state: GlobalState):
+    async def idea_audit_node(self, state: GlobalState, config: RunnableConfig | None = None):
         materials_dump = json.dumps(state.get("materials", []), ensure_ascii=False)
+
+        _COT_FIELDS = {"manual_analysis", "material_synergy"}
+        concept = {k: v for k, v in (state.get("design_concept") or {}).items() if k not in _COT_FIELDS}
 
         result: IdeaReviewResult = await self.idea_chain.ainvoke({
                 "biome": state.get("biome", "Unknown"),
                 "level": state.get("level", 1),
                 "materials": materials_dump,
-                "concept": state.get("design_concept", "")
+                "concept": concept,
             },
-            config={"callbacks": make_callbacks("IdeaAuditor", state.get("session_id", "default"))}
+            config={"callbacks": make_callbacks("IdeaAuditor", state.get("session_id", "default"), config)}
         )
 
 
@@ -100,7 +104,7 @@ class ReviewerAgent:
     # Currently not used in the pipeline
     # ==========================================
 
-    async def tech_audit_node(self, state: GlobalState):
+    async def tech_audit_node(self, state: GlobalState, config: RunnableConfig | None = None):
         attempts = state.get("audit_attempts", 0)
         strictness = "MAXIMUM (Strictly follow manual)"
         if attempts == 1:
@@ -117,15 +121,18 @@ class ReviewerAgent:
         weapon_json_str = json.dumps(final_weapon_data, ensure_ascii=False) if final_weapon_data else "{}"
         print("\n[TechAuditor] 正在对照引擎底层手册进行最终校验...")
 
+        _COT_FIELDS = {"manual_analysis", "material_synergy"}
+        concept = {k: v for k, v in (state.get("design_concept") or {}).items() if k not in _COT_FIELDS}
+
         result: TechAuditResult = await self.tech_chain.ainvoke({
             "biome": state.get("biome", "Unknown"),
             "level": state.get("level", 1),
-            "concept": state.get("design_concept", ""),
+            "concept": concept,
             "final_weapon": weapon_json_str,
             "engine_manual": engine_manual_md,
             "strictness_level": strictness,
         },
-            config={"callbacks": make_callbacks("TechAuditor", state.get("session_id", "default"))})
+            config={"callbacks": make_callbacks("TechAuditor", state.get("session_id", "default"), config)})
 
         color = "\033[92m" if result.is_final_passed else "\033[91m"
         print(f"{color}[Tech Audit] Passed: {result.is_final_passed} | Feedback: {result.tech_feedback}\033[0m")

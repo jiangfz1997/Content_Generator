@@ -4,11 +4,13 @@ from typing import List, Dict, Any
 
 from pydantic import BaseModel, Field, model_validator
 from langchain_core.prompts import load_prompt
+from langchain_core.runnables import RunnableConfig
 
 from app.core.config import settings
 from app.core.state import GlobalState
 from app.services.engine_docs_manager import engine_docs_manager
 from app.services.llm_service import llm_service
+from app.services.primitive_registry import primitive_registry
 from app.utils.callbacks import make_callbacks
 
 
@@ -21,7 +23,7 @@ _PRIMITIVE_PARAM_KEYS: Dict[str, set] = {
     "OP_SPAWN_PROJECTILE": {"projectile_id", "count", "spread_angle"},
 }
 
-_VALID_DIRECTION_MODES = {"HitNormal", "SourceForward", "FromHitPoint", "SourceToTarget"}
+_VALID_DIRECTION_MODES = {"HitNormal", "SourceForward", "FromHitPoint", "SourceToTarget", "FromColliderCenter"}
 _VALID_HP_SOURCES      = {"weapon_multiplier", "absolute"}
 _VALID_HP_CATEGORIES   = {"damage", "heal", "self_damage"}
 _VALID_SPEED_MODES     = {"Set", "Add", "Multiplier"}
@@ -39,15 +41,36 @@ class PrimitiveEntry(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def rescue_flat_params(cls, data: Any) -> Any:
-        """If LLM outputs params=null with fields at the same level, reconstruct params dict."""
+        """
+        Rescue malformed params from three LLM failure modes:
+          1. params is a flat list of alternating [key, val, key, val, ...]
+          2. params is null/missing but fields sit at the same level as primitive_id
+          3. params is already a valid dict — nothing to do
+        """
         if not isinstance(data, dict):
             return data
         pid = data.get("primitive_id", "")
         raw_params = data.get("params")
-        if raw_params:  # params already present and non-empty — nothing to do
+
+        # Case 1: LLM serialized params as an alternating key-value list
+        if isinstance(raw_params, list):
+            if len(raw_params) % 2 == 0:
+                try:
+                    rescued = dict(zip(raw_params[::2], raw_params[1::2]))
+                    print(f"[PrimitiveEntry] Rescued list-format params for {pid}: {list(rescued.keys())}")
+                    data["params"] = rescued
+                    return data
+                except Exception:
+                    pass
+            print(f"[PrimitiveEntry] params is an unrecoverable list for {pid}, using empty dict.")
+            data["params"] = {}
             return data
 
-        # params is None/null/missing — try to collect known param keys from sibling fields
+        # Case 2: params is a valid dict — nothing to do
+        if isinstance(raw_params, dict) and raw_params:
+            return data
+
+        # Case 3: params is None/null/missing — collect known param keys from sibling fields
         known_keys = _PRIMITIVE_PARAM_KEYS.get(pid, set())
         rescued = {k: data[k] for k in known_keys if k in data}
         if rescued:
@@ -55,7 +78,7 @@ class PrimitiveEntry(BaseModel):
             data = {k: v for k, v in data.items() if k not in known_keys}
             data["params"] = rescued
         else:
-            data["params"] = {}  # ensure params is at least an empty dict
+            data["params"] = {}
         return data
 
     @model_validator(mode="after")
@@ -105,7 +128,8 @@ class PrimitiveEntry(BaseModel):
         # ── OP_TIMER ──────────────────────────────────────────────────────────
         elif pid == "OP_TIMER":
             if not isinstance(p.get("duration"), (int, float)):
-                raise ValueError(f"OP_TIMER.duration must be a float, got {p.get('duration')!r}")
+                print(f"[PrimitiveEntry] OP_TIMER.duration missing — defaulting to 3.0")
+                p["duration"] = 3.0
             if not isinstance(p.get("interval"), (int, float)):
                 p["interval"] = 1.0  # safe default
             if not isinstance(p.get("actions"), list):
@@ -124,8 +148,15 @@ class PrimitiveEntry(BaseModel):
 
         # ── OP_SPAWN_PROJECTILE ───────────────────────────────────────────────
         elif pid == "OP_SPAWN_PROJECTILE":
-            if not isinstance(p.get("projectile_id"), str) or not p.get("projectile_id"):
-                raise ValueError(f"OP_SPAWN_PROJECTILE.projectile_id must be a non-empty string")
+            # projectile_id must always be the runtime alias — the actual projectile is
+            # chosen by the designer and stored in weapon.stats.projectile_id at runtime.
+            # Never allow the LLM to hardcode a specific projectile ID here.
+            proj_id = p.get("projectile_id", "")
+            if proj_id != "@weapon.projectile_id":
+                if proj_id:
+                    print(f"[PrimitiveEntry] Replaced hardcoded projectile_id '{proj_id}' "
+                          f"with runtime alias '@weapon.projectile_id'")
+                p["projectile_id"] = "@weapon.projectile_id"
 
         return self
 
@@ -144,9 +175,9 @@ class PayloadFactoryAgent:
             raise FileNotFoundError(f"Missing prompt asset at: {prompt_path}")
 
         self.prompt = load_prompt(str(prompt_path), encoding=settings.ENCODING)
-        self.chain = self.prompt | llm_service.get_model("payload_factory").with_structured_output(GeneratedPayload)
+        self.chain = self.prompt | llm_service.get_structured_model("payload_factory", GeneratedPayload)
 
-    async def generate_node(self, state: GlobalState) -> dict:
+    async def generate_node(self, state: GlobalState, config: RunnableConfig | None = None) -> dict:
         """
         Reads new_payload_spec from design_concept, generates a payload JSON,
         saves it to app/data/payloads/, and appends the description to engine_manual in state.
@@ -165,25 +196,45 @@ class PayloadFactoryAgent:
         description = spec.get("description", "")
         primitive_hint = spec.get("primitive_hint", "")
 
+        # Pre-register the new projectile (if any) as a stub so OP_SPAWN_PROJECTILE validation
+        # can reference it even though projectile_factory may still be running in parallel.
+        new_proj_spec = concept.get("new_projectile_spec") or {}
+        new_proj_id   = new_proj_spec.get("id", "")
+        if new_proj_id and new_proj_id not in primitive_registry.get_all_projectiles():
+            primitive_registry.add_projectile(new_proj_id, {
+                "id": new_proj_id, "stats": {}, "abilities": {"on_hit": []}
+            })
+            print(f"[PayloadFactory] Pre-registered projectile stub: {new_proj_id}")
+
         if state.get("engine_manual"):
             engine_manual_md = state["engine_manual"]
         else:
             engine_manual_md = await engine_docs_manager.get_factory_manual()
 
-        print(f"[PayloadFactory] Generating new payload: {payload_id}")
+        print(f"[PayloadFactory] Generating new payload: {payload_id} | desc={description[:80]}")
 
-        try:
-            result: GeneratedPayload = await self.chain.ainvoke(
-                {
-                    "engine_manual": engine_manual_md,
-                    "payload_id": payload_id,
-                    "payload_description": description,
-                    "primitive_hint": primitive_hint,
-                },
-                config={"callbacks": make_callbacks("PayloadFactory", state.get("session_id", "default"))},
-            )
-        except Exception as e:
-            print(f"[PayloadFactory] Generation failed: {e}")
+        MAX_ATTEMPTS = 3
+        last_error = None
+        result = None
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            try:
+                result = await self.chain.ainvoke(
+                    {
+                        "engine_manual": engine_manual_md,
+                        "payload_id": payload_id,
+                        "payload_description": description,
+                        "primitive_hint": primitive_hint,
+                    },
+                    config={"callbacks": make_callbacks("PayloadFactory", state.get("session_id", "default"), config)},
+                )
+                break  # success
+            except Exception as e:
+                last_error = e
+                print(f"❌ [PayloadFactory] Attempt {attempt}/{MAX_ATTEMPTS} failed for '{payload_id}': {e}")
+
+        if result is None:
+            print(f"❌ [PayloadFactory] All {MAX_ATTEMPTS} attempts failed for '{payload_id}' "
+                  f"(desc='{description}', hint='{primitive_hint}'). Last error: {last_error}")
             return {}
 
         # Use the AI-confirmed ID (it may have corrected casing)

@@ -13,7 +13,7 @@
 | `penetration` | `0` |
 
 ### Abilities
-- **on_hit:** `payload_bullet_hit`
+- **on_hit:** `payload_strike`
 
 ---
 ## `projectile_explosion`
@@ -28,7 +28,7 @@
 | `collider_radius` | `2.5` |
 
 ### Abilities
-- **on_hit:** `payload_explosion_damage`
+- **on_hit:** `payload_explosion`
 
 ---
 ## `projectile_lightning_poison`

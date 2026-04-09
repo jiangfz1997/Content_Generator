@@ -5,14 +5,14 @@
 #   mini_model — same model, token-limited (faster, cheaper for reviewers)
 #   gpt_model  — online OpenAI-compatible model (set OPENAI_API_KEY in .env)
 
-designer:         model
-concept_reviewer: mini_model
-tech_auditor:     mini_model
-weapon_crafter:   model
-weapon_patcher:   model
-payload_factory:      model
-projectile_factory:   model
-summarizer:           model
+#designer:         model
+#concept_reviewer: mini_model
+#tech_auditor:     mini_model
+#weapon_crafter:   model
+#weapon_patcher:   model
+#payload_factory:      model
+#projectile_factory:   model
+#summarizer:           model
 
 ## GOOGLE ONLINE MODELS
 #designer:         google_flash_model
@@ -21,4 +21,18 @@ summarizer:           model
 #weapon_crafter:   google_flash_model
 #weapon_patcher:   google_flash_model
 #payload_factory:  google_flash_model
+#projectile_factory:   google_flash_model
 #summarizer:       model
+
+## OPENAI ONLINE MODELS
+designer:            gpt_mini_model
+concept_reviewer:    mini_model
+tech_auditor:        gpt_mini_model
+weapon_crafter:      gpt_mini_model
+weapon_patcher:      gpt_mini_model
+payload_factory:     gpt_mini_model
+projectile_factory:  gpt_mini_model
+projectile_artist:   gpt_mini_model
+artist:              gpt_mini_model
+summarizer:          model
+

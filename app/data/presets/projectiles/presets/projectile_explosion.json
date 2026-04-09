@@ -8,6 +8,6 @@
     "collider_radius": 2.5
   },
   "abilities": {
-    "on_hit": ["payload_explosion_damage"]
+    "on_hit": ["payload_explode"]
   }
 }

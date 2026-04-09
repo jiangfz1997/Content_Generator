@@ -1,5 +1,6 @@
 import json
 from langchain_core.prompts import load_prompt, ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 
 from app.core.global_prompts import GLOBAL_DESIGN_CONSTITUTION
 from app.core.state import GlobalState
@@ -22,7 +23,7 @@ class WeaponAgent:
         self.prompt = load_prompt(str(prompt_path), encoding=settings.ENCODING)
 
 
-        self.structured_llm = llm_service.get_model("weapon_crafter").with_structured_output(WeaponSchema)
+        self.structured_llm = llm_service.get_structured_model("weapon_crafter", WeaponSchema)
         inject_prompts(GLOBAL_DESIGN_CONSTITUTION, self.prompt)
         self.chain = self.prompt | self.structured_llm
         self.fresh_payloads = None
@@ -52,18 +53,18 @@ Biome: {biome} | Level: {level}
 
 Output ONLY the fields that need to change."""),
         ])
-        self.patch_chain = _patch_prompt | llm_service.get_model("weapon_patcher").with_structured_output(WeaponPatchSchema)
+        self.patch_chain = _patch_prompt | llm_service.get_structured_model("weapon_patcher", WeaponPatchSchema)
 
 
 
 
-    async def crafting_node(self, state: GlobalState):
+    async def crafting_node(self, state: GlobalState, config: RunnableConfig | None = None):
         """
         真正的“大脑”执行逻辑
         """
         # 组装 Chain：Prompt + LLM Service
         # 注意：这里直接使用了 llm_service 暴露出的模型实例
-        print(f"[Crafting Node] 输入状态: biome={state['biome']}, level={state['level']}")
+        print(f"[CraftingNode] biome={state['biome']}, level={state['level']}")
         # 执行推理
         # registry_context = format_registries_for_llm_yaml(available_payloads=self.fresh_payloads,
         #     available_primitives=self.fresh_primitives,
@@ -75,6 +76,10 @@ Output ONLY the fields that need to change."""),
         history_str = "\n".join([f"- {w['weapon_id']}" for w in history]) if history else "No weapons created yet."
 
         concept = state.get("design_concept") or {}
+        # Strip designer CoT fields — they're internal reasoning, not useful to downstream prompts
+        _COT_FIELDS = {"manual_analysis", "material_synergy"}
+        concept = {k: v for k, v in concept.items() if k not in _COT_FIELDS}
+
         keywords = concept.get("keywords", [])
         keywords_str = ", ".join(keywords) if keywords else "none specified"
 
@@ -82,10 +87,18 @@ Output ONLY the fields that need to change."""),
         chosen_ids = concept.get("chosen_payload_ids") or []
         if chosen_ids:
             all_payloads = primitive_registry.get_all_payloads()
-            chosen_payloads_str = "\n".join(
-                f"- {pid}: {all_payloads.get(pid, {}).get('description', '(engine built-in)') if pid != 'payload_shoot_generic' else '(engine built-in) fires projectile_id from stats'}"
-                for pid in chosen_ids
-            )
+            # Fallback for newly-created payloads running in parallel: use designer's spec description
+            new_payload_spec = concept.get("new_payload_spec") or {}
+            new_payload_id   = new_payload_spec.get("id", "")
+            new_payload_desc = new_payload_spec.get("description", "")
+            def _payload_desc(pid: str) -> str:
+                if pid == "payload_shoot_generic":
+                    return "(engine built-in) fires projectile_id from stats"
+                desc = all_payloads.get(pid, {}).get("description", "")
+                if not desc and pid == new_payload_id and new_payload_desc:
+                    desc = new_payload_desc  # payload_factory still running in parallel
+                return desc or "(no description)"
+            chosen_payloads_str = "\n".join(f"- {pid}: {_payload_desc(pid)}" for pid in chosen_ids)
         else:
             chosen_payloads_str = "(none specified — choose from the engine manual)"
 
@@ -115,7 +128,7 @@ Output ONLY the fields that need to change."""),
                 "past_weapons": history_str,
                 "projectile_hint": projectile_hint,
             },
-                config={"callbacks": make_callbacks("WeaponAgent", state.get("session_id", "default"))})
+                config={"callbacks": make_callbacks("WeaponAgent", state.get("session_id", "default"), config)})
 
 
             weapon_dict = weapon_obj.model_dump()
@@ -137,11 +150,11 @@ Output ONLY the fields that need to change."""),
                 "is_valid": False,
                 "validation_errors": err_msg
             }
-    async def patch_node(self, state: GlobalState):
+    async def patch_node(self, state: GlobalState, config: RunnableConfig | None = None):
         """Surgical patch: fix only the fields flagged by tech_auditor feedback."""
         original_weapon = state.get("final_output", {})
         feedback = state.get("tech_feedback", "")
-        print(f"[PatchNode] 外科手术修复，问题: {feedback[:80]}...")
+        print(f"[PatchNode] find issues: {feedback[:80]}...")
 
         if state.get("engine_manual"):
             engine_manual_md = state["engine_manual"]
@@ -157,7 +170,7 @@ Output ONLY the fields that need to change."""),
                     "biome": state.get("biome", "Unknown"),
                     "level": state.get("level", 1),
                 },
-                config={"callbacks": make_callbacks("WeaponPatcher", state.get("session_id", "default"))},
+                config={"callbacks": make_callbacks("WeaponPatcher", state.get("session_id", "default"), config)},
             )
             patched_weapon = apply_weapon_patch(original_weapon, patch_result)
 
@@ -169,10 +182,10 @@ Output ONLY the fields that need to change."""),
                 patched_weapon["stats"]["hit_start"] = 0.0
                 patched_weapon["stats"]["hit_end"] = 0.0
 
-            print(f"[PatchNode] 修复完成: {patch_result.patch_analysis}")
+            print(f"[PatchNode] repair done: {patch_result.patch_analysis}")
             return {"final_output": patched_weapon}
         except Exception as e:
-            print(f"[PatchNode] 修复失败，保留原始数据: {e}")
+            print(f"[PatchNode] repair failed, keeping original data: {e}")
             return {"final_output": original_weapon}
 
 

@@ -34,11 +34,12 @@ class LLMService:
             temperature=0.7,
             max_retries=3,
             timeout=30,
+            thinking_level=os.getenv("THINKING_LEVEL", "low")
         )
 
         api_key = os.getenv("OPENAI_API_KEY")
         base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        self.gpt_model = ChatOpenAI(
+        self.gpt_nano_model = ChatOpenAI(
             model=os.getenv("ONLINE_NANO_MODEL"),
             api_key=api_key,
             base_url=base_url,
@@ -46,13 +47,32 @@ class LLMService:
             max_retries=3,
             timeout=60
         )
+        self.gpt_mini_model = ChatOpenAI(
+            model=os.getenv("OPENAI_MINI_MODEL", os.getenv("ONLINE_NANO_MODEL")),
+            api_key=api_key,
+            base_url=base_url,
+            temperature=0.3,
+            max_retries=2,
+            timeout=20,
+        )
+
+        google_mini_model_name = os.getenv("GOOGLE_MINI_MODEL")
+        self.google_mini_model = ChatGoogleGenerativeAI(
+            model=google_mini_model_name or google_flash_model,  # fall back to flash if mini not configured
+            api_key=google_api_key,
+            temperature=0.3,
+            max_retries=2,
+            timeout=20,
+            thinking_level="minimal",
+        ) if (google_mini_model_name or google_flash_model) else self.gpt_mini_model
 
         self._models = {
             "model": self.model,
             "mini_model": self.mini_model,
-            "gpt_model": self.gpt_model,
+            "gpt_nano_model": self.gpt_nano_model,
+            "gpt_mini_model": self.gpt_mini_model,
             "google_flash_model": self.google_flash_model,
-
+            "google_mini_model": self.google_mini_model,
         }
 
         # Load agent → model key mapping from model_config.yaml
@@ -66,6 +86,14 @@ class LLMService:
         """Return the configured model instance for a given agent name."""
         model_key = self._agent_model_map.get(agent, "model")
         return self._models.get(model_key, self.model)
+
+    def get_structured_model(self, agent: str, schema):
+        """Return model.with_structured_output(schema), using function_calling for OpenAI
+        (which rejects strict JSON schema features like oneOf / additionalProperties)."""
+        model = self.get_model(agent)
+        if isinstance(model, ChatOpenAI):
+            return model.with_structured_output(schema, method="function_calling")
+        return model.with_structured_output(schema)
 
     async def fast_invoke(self, prompt_value):
         return await self.model.ainvoke(prompt_value)

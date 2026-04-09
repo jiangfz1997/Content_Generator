@@ -9,13 +9,13 @@
 ---
 
 # Engine Tactical Manual
-**Overview:** The engine utilizes a suite of primitives such as OP_APPLY_FORCE, OP_MODIFY_HP, OP_MODIFY_SPEED, OP_SPAWN_PROJECTILE, OP_TIMER, OP_ARC, OP_MOVE, OP_ROTATE, and OP_SCALE. OP_MODIFY_HP scales damage based on the source (weapon_multiplier or absolute) and tag (element type), while OP_SPAWN_PROJECTILE allows spawning projectiles from a database with customizable count and spread.
+**Overview:** The engine utilizes a suite of primitives such as OP_APPLY_FORCE, OP_MODIFY_HP, OP_MODIFY_SPEED, OP_SPAWN_PROJECTILE, OP_TIMER, OP_ARC, OP_MOVE, OP_ROTATE, and OP_SCALE. OP_MODIFY_HP scales damage based on the source (weapon_multiplier or absolute) and tag (element type), while OP_SPAWN_PROJECTILE fires the weapon's runtime projectile via "@weapon.projectile_id" — the projectile choice belongs to the designer, not the payload.
 
 ### Atomic Capabilities (Index):
-- OP_APPLY_FORCE: Applies a force to the target or self. (Params: magnitude sets force strength; target_type determines recipient; direction_mode defines knockback direction; override_duration disables AI for smooth stop.)
+- OP_APPLY_FORCE: Applies a force to the target or self. (Params: magnitude sets force strength; target_type determines recipient; direction_mode defines knockback direction — use 'FromColliderCenter' for explosions/AoE so all targets are pushed radially outward from the blast center, use 'SourceToTarget' for melee knockback, use 'SourceForward' for recoil; override_duration disables AI for smooth stop.)
 - OP_MODIFY_HP: Modifies the target's HP based on value and source. (Params: value is positive; source selects weapon_multiplier (level-scaled) or absolute (flat); category sets damage/heal/self_damage; tag names the element.)
 - OP_MODIFY_SPEED: Adjusts speed of target or self. (Params: value modifies speed; target_type determines recipient; mode sets modification type (Set, Add, Multiplier); duration applies temporary buff/debuff.)
-- OP_SPAWN_PROJECTILE: Spawns a projectile from ProjectileDatabase. (Params: projectile_id references database; count sets number of projectiles; spread_angle defines multi-shot spread.)
+- OP_SPAWN_PROJECTILE: Spawns a projectile from ProjectileDatabase. (Params: projectile_id MUST always be "@weapon.projectile_id" — the actual projectile is chosen by the designer at the weapon level and resolved at runtime, never hardcode a specific ID; count sets number of projectiles; spread_angle defines multi-shot spread.)
 - OP_TIMER: Executes actions over a set duration with intervals. (Params: duration sets total time; interval defines execution frequency; actions contain nested primitive effects.)
 
 
@@ -32,7 +32,7 @@
 
 ### payload_shoot_generic
 - Tactical Intent: Direct fire — effective for engaging single targets.
-- Logic: OP_SPAWN_PROJECTILE spawns a projectile from the ProjectileDatabase with a single shot (count=1) and no spread angle.
+- Logic: OP_SPAWN_PROJECTILE fires the weapon's configured projectile via projectile_id="@weapon.projectile_id" (count=1, spread_angle=0). The actual projectile is determined by the designer, not this payload.
 
 ### payload_slow
 - Tactical Intent: Control enemy movement — slows down targets for easier targeting or escape.
@@ -42,6 +42,9 @@
 - Tactical Intent: High damage burst — used for quick, impactful hits.
 - Logic: OP_MODIFY_HP deals an instant burst of physical damage (1.0× weapon damage, physical tag) to the target.
 
+### payload_explode
+- Tactical Intent: Heavy AOE blast — damages and knocks back all enemies caught in the explosion radius.
+- Logic: OP_MODIFY_HP deals 1.5× weapon damage (physical), then OP_APPLY_FORCE knocks back target radially outward from the explosion center (FromColliderCenter) with magnitude 20.
 
 ---
 
@@ -180,7 +183,7 @@ Maps **trigger keys** to ordered lists of payload IDs. Each payload is defined s
     "spread_angle": 0.0
   },
   "motions": [
-    { "primitive_id": "OP_MOVE", "params": { "start": {"x":0,"y":0}, "end": {"x":-0.3,"y":0}, "curve": "EaseOut" } }
+    { "primitive_id": "OP_ROTATE", "params": { "start": 0, "end": -15, "curve": "EaseOut" } }
   ],
   "abilities": {
     "on_hit":    [],
@@ -190,6 +193,18 @@ Maps **trigger keys** to ordered lists of payload IDs. Each payload is defined s
 }
 ```
 
+## Motion Design Rules — Ranged Weapons
+
+Design motions based on the **physical nature** of the weapon, NOT just the fact that it fires a projectile.
+
+| Weapon type | Recommended motion | Example |
+| :--- | :--- | :--- |
+| **Firearms** (pistol, rifle, shotgun, cannon) | Backward `OP_MOVE` to simulate recoil | `end: {x:-0.3, y:0}, curve: EaseOut` |
+| **Bows / crossbows** | Pull-back then snap: `OP_MOVE` EaseIn + OP_ROTATE | `end: {x:-0.15, y:0}` then release |
+| **Wands / staves / magic** | Gentle forward thrust or rotate | `end: {x:0.2, y:0}` or small OP_ROTATE |
+| **Thrown weapons** | Forward throw arc | `end: {x:0.3, y:0.1}` |
+
+> **CRITICAL:** Never add a backward recoil motion (`OP_MOVE` with negative x) to a wand, bow, staff, orb, or any magic weapon. Recoil is exclusive to physical firearms.
 
 ---
 
@@ -209,7 +224,7 @@ Maps **trigger keys** to ordered lists of payload IDs. Each payload is defined s
 | `penetration` | `0` |
 
 ### Abilities
-- **on_hit:** `payload_bullet_hit`
+- **on_hit:** `payload_strike`
 
 ---
 ## `projectile_explosion`
@@ -224,7 +239,7 @@ Maps **trigger keys** to ordered lists of payload IDs. Each payload is defined s
 | `collider_radius` | `2.5` |
 
 ### Abilities
-- **on_hit:** `payload_explosion_damage`
+- **on_hit:** `payload_explode`
 
 ---
 ## `projectile_lightning_poison`

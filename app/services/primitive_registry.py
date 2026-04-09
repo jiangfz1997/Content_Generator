@@ -20,9 +20,7 @@ class PrimitiveRegistry:
         self._payload_cache: Dict[str, Any] = {}
         self._projectile_cache: Dict[str, Any] = {}
 
-    # ------------------------------------------------------------------
-    # Async initializer — call once from main() after DB is connected
-    # ------------------------------------------------------------------
+
 
     async def initialize(self, session_id: Optional[str] = None):
         """Load presets (+ optional session payloads/projectiles) from MongoDB into cache."""
@@ -35,12 +33,10 @@ class PrimitiveRegistry:
         projectiles = await projectile_mongo_service.get_all_projectiles(session_id)
         self._projectile_cache = {p["id"]: p for p in projectiles}
 
-        print(f"✅ [Registry] 缓存已加载: {len(self._payload_cache)} payloads, "
+        print(f"✅ [Registry] cache loaded: {len(self._payload_cache)} payloads, "
               f"{len(self._projectile_cache)} projectiles")
 
-    # ------------------------------------------------------------------
-    # Cache update helpers — called by factories after generation
-    # ------------------------------------------------------------------
+
 
     def add_payload(self, payload_id: str, payload_data: dict):
         self._payload_cache[payload_id] = payload_data
@@ -48,9 +44,7 @@ class PrimitiveRegistry:
     def add_projectile(self, projectile_id: str, projectile_data: dict):
         self._projectile_cache[projectile_id] = projectile_data
 
-    # ------------------------------------------------------------------
-    # Synchronous getters (safe for Pydantic validators & workflow nodes)
-    # ------------------------------------------------------------------
+
 
     def get_all_payloads(self) -> Dict[str, Any]:
         if self._payload_cache:
@@ -63,9 +57,7 @@ class PrimitiveRegistry:
             return dict(self._projectile_cache)
         return self._scan_dir(settings.PROJECTILES_PRESET_PATH) or self._scan_dir(self.projectiles_dir)
 
-    # ------------------------------------------------------------------
-    # Schema readers (unchanged)
-    # ------------------------------------------------------------------
+
 
     def get_primitives_schema(self) -> str:
         try:

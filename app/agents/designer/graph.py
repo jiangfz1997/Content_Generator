@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.core.global_prompts import GLOBAL_DESIGN_CONSTITUTION
 from app.services.llm_service import llm_service
 from langchain_core.prompts import load_prompt
+from langchain_core.runnables import RunnableConfig
 from app.core.state import GlobalState
 from app.utils.inject_prompts import inject_prompts
 from app.utils.callbacks import make_callbacks
@@ -197,6 +198,10 @@ class DesignBlueprint(BaseModel):
             print(f"[DesignBlueprint] Removed invalid chosen_payload_ids: {invalid}")
         self.chosen_payload_ids = valid
 
+        # Fix 3b: strip auto-injected base payloads that the LLM mistakenly listed manually
+        _AUTO_INJECTED = {"payload_shoot_generic", "payload_strike"}
+        self.chosen_payload_ids = [pid for pid in self.chosen_payload_ids if pid not in _AUTO_INJECTED]
+
         # Fix 4: auto-inject base payload if missing
         def _has_toplevel_primitive(pid: str, primitive: str) -> bool:
             """Check if a payload's TOP-LEVEL sequence contains a primitive.
@@ -255,12 +260,12 @@ class DesignerAgent:
             raise FileNotFoundError(f"Missing prompt asset at: {prompt_path}")
 
         # 绑定带有 CoT 字段的模型
-        self.planner_llm = llm_service.get_model("designer").with_structured_output(DesignBlueprint)
+        self.planner_llm = llm_service.get_structured_model("designer", DesignBlueprint)
 
         self.prompt = load_prompt(str(prompt_path), encoding=settings.ENCODING)
         self.chain = self.prompt | self.planner_llm
 
-    async def planning_node(self, state: GlobalState):
+    async def planning_node(self, state: GlobalState, config: RunnableConfig | None = None):
         # 1. 序列化基础物资
         raw_materials = state.get("materials", [])
         materials_full_dump = [json.dumps(_slim_material(m), ensure_ascii=False) for m in raw_materials]
@@ -314,7 +319,7 @@ class DesignerAgent:
         else:
             history_str = "No weapons created yet. You are designing the first one."
 
-        print(f"[Designer] 正在查阅引擎手册，并结合 {state.get('biome')} 环境构思蓝图...")
+        print(f"[Designer] Consulting engine manual, designing for biome={state.get('biome')}...")
 
         # Build available projectiles summary for the prompt
         all_projectiles = primitive_registry.get_all_projectiles()
@@ -339,10 +344,10 @@ class DesignerAgent:
                 "available_projectiles": available_projectiles,
             },
             
-            config={"callbacks": make_callbacks("DesignerAgent", state.get("session_id", "default"))}
+            config={"callbacks": make_callbacks("DesignerAgent", state.get("session_id", "default"), config)}
         )
 
-        print(f"[Designer] 构思完成: {blueprint.codename}")
+        print(f"[Designer] Blueprint ready: {blueprint.codename}")
 
         return {"design_concept": blueprint.model_dump()}
 

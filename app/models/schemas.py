@@ -27,9 +27,28 @@ class WeaponStats(BaseModel):
     projectile_count: int = Field(default=1, description="Number of projectiles per attack. 1=pistol, 5=shotgun.")
     spread_angle: float = Field(default=0.0, description="Total spread in degrees when count > 1. E.g. 30 = fan across 30°.")
 
+class TintColor(BaseModel):
+    r: float = Field(default=1.0, ge=0.0, le=1.0, description="Red channel (0.0–1.0)")
+    g: float = Field(default=1.0, ge=0.0, le=1.0, description="Green channel (0.0–1.0)")
+    b: float = Field(default=1.0, ge=0.0, le=1.0, description="Blue channel (0.0–1.0)")
+    a: float = Field(default=1.0, ge=0.0, le=1.0, description="Alpha channel (0.0–1.0)")
+
+
 class VisualStats(BaseModel):
     world_length: float = Field(description="武器在世界空间中的视觉长度，例如匕首0.8，长矛3.0")
-    pivot: Vector2 = Field(default_factory=lambda: Vector2(x=0.5, y=0.5),description="旋转轴心点，通常 x=0.0 (底部) 或 x=0.5 (中心)")
+    pivot: Vector2 = Field(default_factory=lambda: Vector2(x=0.5, y=0.5), description="旋转轴心点，通常 x=0.0 (底部) 或 x=0.5 (中心)")
+    scale: float = Field(
+        default=1.0,
+        description=(
+            "Uniform sprite scale multiplier applied by Unity. 1.0 = default size. "
+            "Small/light weapons (dagger, wand): 0.7–0.9. Normal weapons (sword, axe): 1.0. "
+            "Large/heavy weapons (greatsword, giant hammer, spear): 1.2–1.5."
+        ),
+    )
+    tint_color: TintColor = Field(
+        default_factory=TintColor,
+        description="RGBA tint applied to the weapon sprite in Unity (0.0–1.0 per channel). Match the weapon's theme: fire→warm orange-red, ice→cold blue-white, poison→sickly green, shadow→dark purple.",
+    )
 
 
 
@@ -111,7 +130,15 @@ class ProjectileStats(BaseModel):
     speed: float = Field(description="Travel speed in world units/s. Set 0 for stationary explosion area.")
     lifetime: float = Field(description="Max seconds before self-destruct regardless of hit.")
     penetration: int = Field(default=0, description="Extra targets hit after the first. 0=single target, 99=unlimited (explosion area).")
-    collider_radius: float = Field(default=0.1, description="CircleCollider2D radius in world units. Use ~2.5 for explosion areas.")
+    collider_radius: float = Field(
+        default=0.1,
+        description=(
+            "Explosion detection radius in world units. "
+            "ONLY set this for explosive/AoE projectiles (e.g. fireball, grenade, AoE cloud): use 1.5–3.0. "
+            "For all normal projectiles (bullet, arrow, bolt, orb) leave at default 0.1 — "
+            "they hit a single target on contact and do NOT have an area effect."
+        ),
+    )
 
 class ProjectileAbilities(BaseModel):
     on_hit: List[AvailablePayloads] = Field(
@@ -131,16 +158,12 @@ def apply_weapon_patch(original_json: dict, patch: WeaponPatchSchema) -> dict:
     """
     将 AI 生成的补丁对象安全地合并到原始 JSON 数据中
     """
-    # 1. 将原始字典转换为 Pydantic 对象（model_validate 会正确解析 discriminated union 嵌套结构）
     original_obj = WeaponSchema.model_validate(original_json)
 
-    # 2. 提取补丁中真正被赋值的字段 (排除 unset 的字段)
     patch_data = patch.model_dump(exclude_unset=True)
 
-    # 3. 移除补丁专用的分析字段，不污染核心数据
     patch_data.pop("patch_analysis", None)
 
-    # 4. 合并后重新 model_validate，确保 discriminated union 字段（motions 等）被正确解析
     merged = {**original_obj.model_dump(), **patch_data}
     updated_obj = WeaponSchema.model_validate(merged)
 
