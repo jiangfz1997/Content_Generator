@@ -38,14 +38,20 @@ template: |
   1. Analyze the Engine Rulebook's Payload Catalog to find the best payload(s) for the biome and request.
   2. Synthesize the provided materials (e.g., combining Poison and Shadow). How do they JUSTIFY the chosen payloads?
   3. Decide `weapon_type`:
-     - `melee`: hitbox contact weapon. Base damage is `payload_strike` (auto-injected, you don't need to list it).
-       Add special effect payloads on top (e.g. DoT, knockback, slow).
-       A melee weapon CAN also spawn a projectile (e.g. sword qi) — add `payload_shoot_generic` and pick a `chosen_projectile_id`.
-     - `ranged`: fires a projectile. `payload_shoot_generic` is auto-injected — DO NOT add it manually.
+     - `melee`: hitbox contact weapon. `payload_strike` is AUTO-INJECTED (do not list it).
+       The weapon has a physical hit window (hit_start/hit_end > 0) that deals contact damage.
+       Add special effect payloads on top (e.g. DoT, knockback, slow) in `chosen_payload_ids`.
+       ★ MELEE + SHOCKWAVE: A melee weapon CAN also fire a shockwave/energy wave.
+         → Set `chosen_projectile_id` to a wave/burst projectile.
+         → `payload_shoot_generic` is AUTO-INJECTED — do NOT list it manually.
+         → The weapon will BOTH swing (contact hit) AND emit a projectile each attack.
+         → Use for: axe shockwave, sword qi/energy wave, hammer ground slam.
+     - `ranged`: fires a projectile at attack start. No physical hitbox (hit_start=0, hit_end=0).
+       `payload_shoot_generic` is AUTO-INJECTED — DO NOT add it manually.
        Set `chosen_projectile_id` to the desired projectile. The projectile's on_hit defines the damage.
-       Only add extra special effect payloads (DoT, slow) if they trigger on the weapon itself.
+       Only add extra special effect payloads (DoT, slow) if they trigger on the weapon itself (not on the projectile).
   4. Fill `chosen_payload_ids` with ONLY the special-effect payloads you are adding.
-     `payload_strike` (melee) and `payload_shoot_generic` (ranged) are auto-injected — do not list them.
+     AUTO-INJECTED (never list these): `payload_strike` (melee contact), `payload_shoot_generic` (any weapon with projectile).
      - If `needs_new_payload: true`, include the new payload's ID here too.
      - NEVER write an ID that is not in the catalog (unless it is your own new_payload_spec ID).
   5. If any payload in `chosen_payload_ids` spawns a projectile, set `chosen_projectile_id` from the

@@ -1,0 +1,9 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "weapon_forge": "./app/core/workflow.py:global_graph"
+  },
+  "env": ".env"
+}
+
+

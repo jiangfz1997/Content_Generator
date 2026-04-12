@@ -1,0 +1,18 @@
+# Projectile animation presets available in the Unity engine.
+# Each entry describes the visual behaviour so the LLM can make an informed choice.
+#
+# Fields:
+#   description : one-line summary shown to the LLM for selection guidance
+#   shape       : rough shape keyword(s) — used for matching hints
+#   theme       : elemental/visual theme keywords
+
+presets:
+  fireball:
+    description: "Glowing sphere of fire. Leaves a brief flame trail. Suits fire/explosion projectiles."
+    shape: ["orb", "ball", "sphere"]
+    theme: ["fire", "flame", "burn", "explosion", "heat"]
+
+  arrow:
+    description: "Thin elongated shaft. Aligned to travel direction. Suits physical/piercing projectiles."
+    shape: ["arrow", "bolt", "needle", "dart", "spear"]
+    theme: ["physical", "pierce", "wind", "ice", "lightning", "poison"]

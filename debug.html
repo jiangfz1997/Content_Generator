@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Weapon Debug Viewer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: monospace; background: #1a1a2e; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
+
+  /* ── Left panel ── */
+  #sidebar { width: 280px; min-width: 200px; background: #16213e; border-right: 1px solid #0f3460; display: flex; flex-direction: column; }
+  #sidebar h2 { padding: 14px 16px 8px; font-size: 13px; color: #a0aec0; text-transform: uppercase; letter-spacing: 1px; }
+  #session-filter { display: flex; gap: 4px; padding: 6px 10px; border-bottom: 1px solid #0f3460; flex-wrap: wrap; }
+  .sf-btn { font-size: 10px; padding: 3px 8px; border-radius: 4px; border: 1px solid #2d4a6e; background: #0f1e33; color: #718096; cursor: pointer; transition: background 0.15s, color 0.15s; }
+  .sf-btn:hover { background: #162840; color: #a0aec0; }
+  .sf-btn.active { background: #1a3a5e; border-color: #4299e1; color: #90cdf4; }
+  #session-list { flex: 1; overflow-y: auto; }
+  .session-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #0f3460; transition: background 0.15s; }
+  .session-item:hover { background: #0f3460; }
+  .session-item.active { background: #e94560; color: #fff; }
+  .session-item .sid { font-size: 11px; word-break: break-all; }
+  .session-item .meta { font-size: 10px; color: #718096; margin-top: 3px; }
+  .session-item.active .meta { color: #ffd6dc; }
+
+  /* ── Right panel ── */
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #toolbar { padding: 10px 16px; background: #16213e; border-bottom: 1px solid #0f3460; display: flex; align-items: center; gap: 12px; font-size: 12px; color: #a0aec0; }
+  #toolbar #session-label { font-size: 13px; color: #e0e0e0; }
+  #status-dot { width: 8px; height: 8px; border-radius: 50%; background: #fc4444; flex-shrink: 0; }
+  #status-dot.connected { background: #48bb78; }
+
+  /* ── Content tabs ── */
+  #content-tabs { display: flex; background: #16213e; border-bottom: 2px solid #0f3460; padding: 0 8px; }
+  .ct-btn { padding: 9px 18px; font-size: 12px; cursor: pointer; color: #a0aec0; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.15s; }
+  .ct-btn:hover { color: #e0e0e0; }
+  .ct-btn.active { color: #e94560; border-bottom-color: #e94560; }
+  .ct-btn .ct-count { color: #718096; font-size: 10px; margin-left: 4px; }
+  .ct-btn.active .ct-count { color: #e94560; }
+
+  /* ── Item grids ── */
+  .content-panel { display: none; flex: 1; overflow-y: auto; padding: 16px; }
+  .content-panel.active { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; align-content: start; }
+  #empty-state { color: #4a5568; font-size: 13px; padding: 40px; text-align: center; grid-column: 1/-1; }
+
+  /* ── Weapon card ── */
+  .card { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 14px; display: flex; gap: 12px; cursor: pointer; transition: border-color 0.15s; }
+  .card:hover { border-color: #e94560; }
+  .card-icon { width: 64px; height: 64px; flex-shrink: 0; background: #0f3460; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #718096; overflow: hidden; }
+  .card-icon img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  .card-body { flex: 1; min-width: 0; }
+  .card-name { font-size: 13px; font-weight: bold; color: #e94560; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-id   { font-size: 10px; color: #718096; margin-bottom: 6px; }
+  .card-row  { font-size: 11px; color: #a0aec0; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .tag { background: #0f3460; border-radius: 4px; padding: 2px 6px; font-size: 10px; color: #90cdf4; }
+  .tag.red    { background: #3d1a1a; color: #fc8181; }
+  .tag.green  { background: #1a3d2b; color: #68d391; }
+  .tag.time   { background: #2d2a1a; color: #f6e05e; }
+  .tag.purple { background: #2a1a3d; color: #d6bcfa; }
+  .tag.orange { background: #3d2a1a; color: #f6ad55; }
+
+  /* ── Payload card ── */
+  .payload-card { background: #16213e; border: 1px solid #1a4a2a; border-radius: 8px; padding: 14px; cursor: pointer; transition: border-color 0.15s; }
+  .payload-card:hover { border-color: #68d391; }
+  .payload-card .card-name { color: #68d391; }
+
+  /* ── Projectile card ── */
+  .proj-card { background: #16213e; border: 1px solid #2a1a4a; border-radius: 8px; padding: 14px; display: flex; gap: 12px; cursor: pointer; transition: border-color 0.15s; }
+  .proj-card:hover { border-color: #d6bcfa; }
+  .proj-card .card-name { color: #d6bcfa; }
+
+  /* ── Modal overlay ── */
+  #modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+  #modal-overlay.open { display: flex; }
+  #modal {
+    background: #16213e; border: 1px solid #0f3460; border-radius: 10px;
+    width: 820px; max-width: 95vw; max-height: 90vh;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* modal header */
+  #modal-header { padding: 14px 18px; border-bottom: 1px solid #0f3460; display: flex; align-items: center; gap: 12px; }
+  #modal-icon { width: 48px; height: 48px; background: #0f3460; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+  #modal-icon img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  #modal-title { flex: 1; }
+  #modal-title h3 { font-size: 15px; color: #e94560; }
+  #modal-title p  { font-size: 11px; color: #718096; margin-top: 2px; }
+  #modal-close { cursor: pointer; font-size: 20px; color: #718096; padding: 4px 8px; border-radius: 4px; }
+  #modal-close:hover { color: #e0e0e0; background: #0f3460; }
+
+  /* modal tabs */
+  #modal-tabs { display: flex; border-bottom: 1px solid #0f3460; background: #0f3460; }
+  .tab-btn { padding: 8px 18px; font-size: 12px; cursor: pointer; color: #a0aec0; border-bottom: 2px solid transparent; }
+  .tab-btn:hover { color: #e0e0e0; }
+  .tab-btn.active { color: #e94560; border-bottom-color: #e94560; background: #16213e; }
+
+  /* modal body */
+  #modal-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .tab-panel { display: none; flex: 1; overflow-y: auto; padding: 16px; }
+  .tab-panel.active { display: block; }
+
+  /* detail view */
+  .detail-section { margin-bottom: 18px; }
+  .detail-section h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #718096; margin-bottom: 8px; border-bottom: 1px solid #0f3460; padding-bottom: 4px; }
+  .detail-grid { display: grid; grid-template-columns: 140px 1fr; gap: 4px 12px; font-size: 12px; }
+  .detail-grid .k { color: #718096; }
+  .detail-grid .v { color: #e0e0e0; word-break: break-all; }
+  .payload-row { margin: 3px 0; display: flex; gap: 6px; align-items: center; }
+  .payload-trigger { font-size: 10px; color: #718096; width: 70px; flex-shrink: 0; }
+  .motion-block { background: #0f3460; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 11px; }
+  .motion-block .mid { color: #90cdf4; font-weight: bold; }
+  .motion-params { color: #a0aec0; margin-top: 4px; }
+  .prim-block { background: #0f1a0f; border: 1px solid #1a4a2a; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 11px; }
+  .prim-block .pid { color: #68d391; font-weight: bold; }
+  .prim-params { color: #a0aec0; margin-top: 4px; white-space: pre; font-size: 10px; }
+
+  /* json view */
+  #json-view { background: #0d1117; border-radius: 6px; padding: 14px; font-size: 11px; line-height: 1.6; white-space: pre; overflow-x: auto; }
+  .json-key    { color: #79c0ff; }
+  .json-str    { color: #a5d6ff; }
+  .json-num    { color: #f2cc60; }
+  .json-bool   { color: #ff7b72; }
+  .json-null   { color: #8b949e; }
+
+  /* timing bars */
+  .timing-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; }
+  .timing-label { width: 140px; flex-shrink: 0; color: #a0aec0; text-align: right; }
+  .timing-bar-wrap { flex: 1; background: #0f3460; border-radius: 4px; height: 14px; overflow: hidden; }
+  .timing-bar { height: 100%; background: #e94560; border-radius: 4px; transition: width 0.3s; }
+  .timing-val { width: 52px; flex-shrink: 0; color: #f6e05e; text-align: right; }
+  .timing-total { margin-top: 14px; padding-top: 10px; border-top: 1px solid #0f3460; font-size: 12px; color: #a0aec0; display: flex; justify-content: space-between; }
+  .timing-total span { color: #f6e05e; font-weight: bold; }
+
+  /* copy btn */
+  #copy-btn { margin: 10px 16px 0; padding: 6px 14px; background: #0f3460; border: 1px solid #1e4080; border-radius: 6px; color: #90cdf4; font-size: 11px; cursor: pointer; align-self: flex-start; }
+  #copy-btn:hover { background: #1e4080; }
+
+  /* color swatch */
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+
+  /* ── Resize handles ── */
+  .rh-v { width: 5px; flex-shrink: 0; background: #0f3460; cursor: col-resize; transition: background 0.15s; position: relative; z-index: 10; }
+  .rh-v:hover, .rh-v.rh-active { background: #4299e1; }
+
+  /* ── Pipeline tab ── */
+  .content-panel.pipeline-panel.active { display: flex; flex-direction: row; padding: 0; gap: 0; overflow: hidden; }
+
+  /* DAG column */
+  #pipeline-dag { width: 210px; min-width: 140px; flex-shrink: 0; overflow-y: auto; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .pipeline-node { width: 180px; padding: 7px 10px; border-radius: 6px; border: 1px solid #2d4a6e; background: #0a1428; cursor: pointer; transition: border-color 0.15s, background 0.15s; text-align: center; flex-shrink: 0; }
+  .pipeline-node:hover { border-color: #4a7aaa; }
+  .pipeline-node.node-active { border-color: #4299e1; background: #071830; animation: pnode-pulse 1.6s ease-in-out infinite; }
+  .pipeline-node.node-done   { border-color: #48bb78; background: #071a0e; }
+  .pipeline-node.node-error  { border-color: #e94560; background: #1a0710; }
+  .pipeline-node.node-selected { outline: 2px solid #f6e05e; outline-offset: 1px; }
+  @keyframes pnode-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(66,153,225,0.5); } 50% { box-shadow: 0 0 0 5px rgba(66,153,225,0.08); } }
+  .pnode-label { font-size: 11px; font-weight: bold; color: #e0e0e0; }
+  .pnode-desc  { font-size: 9px; color: #718096; margin-top: 2px; }
+  .pipeline-arrow { color: #4a5568; font-size: 13px; line-height: 1.6; pointer-events: none; }
+  .pipeline-parallel-group { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; width: 100%; }
+  .pipeline-parallel-group .pipeline-node { flex: 1 1 120px; min-width: 0; width: auto; font-size: 10px; }
+
+  /* Detail column */
+  #pipeline-detail-panel { width: 300px; min-width: 160px; flex-shrink: 0; overflow-y: auto; padding: 10px 12px; }
+  #pipeline-detail-placeholder { color: #4a5568; font-size: 12px; padding: 24px 0; text-align: center; }
+  .pdetail-node-name { font-size: 13px; font-weight: bold; color: #90cdf4; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #0f3460; }
+
+  /* collapsible sections */
+  .col-section { margin-bottom: 8px; }
+  .col-hdr { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 4px; cursor: pointer; user-select: none; font-size: 11px; font-weight: bold; color: #a0aec0; text-transform: uppercase; letter-spacing: 0.8px; background: #0f1e33; }
+  .col-hdr:hover { background: #162840; }
+  .col-arrow { font-size: 9px; transition: transform 0.15s; }
+  .col-hdr.open .col-arrow { transform: rotate(90deg); }
+  .col-body { padding: 6px 0 4px 0; }
+
+  /* state key-value rows */
+  .sv-row { display: flex; flex-direction: column; padding: 3px 4px; border-bottom: 1px solid #0d1e30; }
+  .sv-row:last-child { border-bottom: none; }
+  .sv-key { font-size: 10px; color: #718096; margin-bottom: 2px; }
+  .sv-val { font-size: 11px; color: #e0e0e0; word-break: break-all; }
+  .sv-empty { font-size: 11px; color: #4a5568; padding: 4px; }
+  .v-null  { color: #718096; }
+  .v-bool  { color: #fc8181; }
+  .v-num   { color: #f6e05e; }
+  .v-str   { color: #a5d6ff; white-space: pre-wrap; }
+  .v-long  { color: #718096; font-style: italic; }
+  .v-json  { margin: 2px 0; padding: 4px 6px; background: #0d1117; border-radius: 4px; font-size: 10px; line-height: 1.5; overflow-x: auto; max-height: 120px; white-space: pre; }
+
+  /* Stream column */
+  #pipeline-stream-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  #pipeline-stream-header { padding: 7px 12px; border-bottom: 1px solid #0f3460; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: #a0aec0; flex-shrink: 0; }
+  #pipeline-stream-header label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  #pipeline-stream-log { flex: 1; overflow-y: auto; padding: 8px 12px; }
+  .stream-section { margin-bottom: 14px; border-left: 2px solid #1a3a5e; padding-left: 8px; }
+  .stream-section.active-section { border-left-color: #4299e1; }
+  .stream-node-label { font-size: 10px; font-weight: bold; color: #4299e1; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .stream-tokens { font-size: 11px; color: #c8d8e8; line-height: 1.6; white-space: pre-wrap; word-break: break-word; font-family: monospace; }
+
+  /* ── Arrow highlight ── */
+  .pipeline-arrow { color: #2d4a6e; font-size: 16px; line-height: 1.4; pointer-events: none; transition: color 0.3s; }
+  .pipeline-arrow.arrow-active { color: #4299e1; }
+
+  /* ── Node timer ── */
+  .pnode-time { font-size: 9px; color: #f6e05e; margin-top: 3px; min-height: 11px; letter-spacing: 0.3px; }
+
+  /* ── Trace tab ── */
+  .trace-node-item { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; margin: 2px 0; border-radius: 4px; font-size: 11px; gap: 6px; }
+  .trace-node-item.trace-ran { background: #071a0e; border: 1px solid #2d6e45; cursor: pointer; color: #68d391; }
+  .trace-node-item.trace-ran:hover, .trace-node-item.trace-ran.selected { background: #0d2a18; border-color: #48bb78; }
+  .trace-node-item.trace-skipped { color: #4a5568; border: 1px dashed #2d3a4e; }
+  .trace-node-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .trace-duration { font-size: 10px; color: #f6e05e; flex-shrink: 0; }
+
+  /* ── Pipeline config overlay ── */
+  #pipeline-dag-header { padding: 8px 10px 4px; font-size: 10px; color: #718096; text-align: center; flex-shrink: 0; }
+  #pipeline-mode-badge { display: inline-block; background: #0f3460; border-radius: 4px; padding: 2px 7px; color: #90cdf4; margin-bottom: 4px; }
+  .node-skipped { opacity: 0.3 !important; border-style: dashed !important; pointer-events: none; }
+  .node-skipped .pnode-label { text-decoration: line-through; }
+  .node-skipped .pnode-desc  { text-decoration: line-through; }
+
+  /* ── Weapon section divider ── */
+  .weapon-section-header { grid-column: 1/-1; display: flex; align-items: center; gap: 10px; margin: 4px 0 2px; }
+  .weapon-section-header span { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #4a5568; white-space: nowrap; }
+  .weapon-section-header::after { content: ""; flex: 1; border-top: 1px solid #0f3460; }
+  .weapon-section-divider { grid-column: 1/-1; border: none; border-top: 1px solid #0f3460; margin: 10px 0 6px; }
+  .tag.preset { background: #1a2a1a; color: #68d391; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h2>Sessions <span id="session-count" style="color:#e94560"></span></h2>
+  <div id="session-filter">
+    <div class="sf-btn active" data-filter="all"    onclick="setSessionFilter('all')">All</div>
+    <div class="sf-btn"        data-filter="5"      onclick="setSessionFilter('5')">Top 5</div>
+    <div class="sf-btn"        data-filter="10"     onclick="setSessionFilter('10')">Top 10</div>
+    <div class="sf-btn"        data-filter="30min"  onclick="setSessionFilter('30min')">30 min</div>
+  </div>
+  <div id="session-list"><div style="padding:16px;font-size:11px;color:#4a5568">Connecting…</div></div>
+</div>
+<div class="rh-v" id="sidebar-rh"></div>
+
+<div id="main">
+  <div id="toolbar">
+    <div id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+    <span style="flex:1"></span>
+    <span id="session-label">— no session selected —</span>
+  </div>
+
+  <div id="content-tabs">
+    <div class="ct-btn active" data-tab="weapons"     onclick="switchContentTab('weapons')">Weapons<span class="ct-count" id="ct-weapons-count"></span></div>
+    <div class="ct-btn"        data-tab="payloads"    onclick="switchContentTab('payloads')">Payloads<span class="ct-count" id="ct-payloads-count"></span></div>
+    <div class="ct-btn"        data-tab="projectiles" onclick="switchContentTab('projectiles')">Projectiles<span class="ct-count" id="ct-projectiles-count"></span></div>
+    <div class="ct-btn"        data-tab="pipeline"    onclick="switchContentTab('pipeline')">Pipeline</div>
+  </div>
+
+  <div id="panel-weapons"     class="content-panel active"><div id="empty-state">Select a session from the left panel</div></div>
+  <div id="panel-payloads"    class="content-panel"><div id="empty-state">Select a session from the left panel</div></div>
+  <div id="panel-projectiles" class="content-panel"><div id="empty-state">Select a session from the left panel</div></div>
+
+  <div id="panel-pipeline" class="content-panel pipeline-panel">
+    <div id="pipeline-dag">
+      <div id="pipeline-dag-header">
+        <div id="pipeline-mode-badge">serial</div>
+      </div>
+    </div>
+    <div class="rh-v" id="dag-rh"></div>
+    <div id="pipeline-detail-panel">
+      <div id="pipeline-detail-placeholder">Click a node to inspect</div>
+      <div id="pipeline-detail-content"></div>
+    </div>
+    <div class="rh-v" id="detail-rh"></div>
+    <div id="pipeline-stream-panel">
+      <div id="pipeline-stream-header">
+        <span>Agent Output</span>
+        <label><input type="checkbox" id="pipeline-auto-follow" checked> Auto-follow active node</label>
+      </div>
+      <div id="pipeline-stream-log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Detail Modal ── -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div id="modal-header">
+      <div id="modal-icon"></div>
+      <div id="modal-title"><h3 id="modal-name">—</h3><p id="modal-id">—</p></div>
+      <div id="modal-close" onclick="closeModal()">✕</div>
+    </div>
+    <div id="modal-tabs"></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+const WS_URL = "ws://localhost:8080";
+let ws = null;
+let activeSession = null;
+let currentItem = null;   // {type: 'weapon'|'payload'|'projectile', data}
+let _systemWeapons = [];
+let _sessionWeapons = [];
+
+// ── WebSocket ────────────────────────────────────────────────────────────────
+function connect() {
+  ws = new WebSocket(WS_URL);
+  ws.onopen  = () => { setStatus(true); send("debug_list_sessions", {}); };
+  ws.onclose = () => { setStatus(false); setTimeout(connect, 3000); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.msgType === "DebugSessionList")      renderSessions(msg.payload.sessions);
+    if (msg.msgType === "DebugSystemWeaponList") { _systemWeapons = msg.payload.weapons || []; _renderWeaponPanel(); }
+    if (msg.msgType === "DebugWeaponList")       { _sessionWeapons = msg.payload.weapons || []; _renderWeaponPanel(); }
+    if (msg.msgType === "DebugPayloadList")      renderPayloads(msg.payload.payloads);
+    if (msg.msgType === "DebugProjectileList")   renderProjectiles(msg.payload.projectiles);
+    if (msg.msgType === "PipelineProgressEvent") {
+      handlePipelineProgress(msg.payload);
+      // Live-insert newly generated weapon into session section
+      if (msg.payload.type === "new_weapon" && msg.payload.weapon) {
+        const w = msg.payload.weapon;
+        if (w.session_id === activeSession) {
+          _sessionWeapons = [w, ..._sessionWeapons.filter(x => x.id !== w.id)];
+          _renderWeaponPanel();
+        }
+      }
+    }
+    if (msg.msgType === "PipelineConfigEvent")   applyPipelineConfig(msg.payload);
+  };
+}
+function send(action, extra = {}) {
+  if (ws && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify({ msgType: "Request", payload: { action, ...extra } }));
+}
+function setStatus(ok) {
+  document.getElementById("status-dot").className = ok ? "connected" : "";
+  document.getElementById("status-text").textContent = ok ? "Connected" : "Disconnected — retrying…";
+}
+
+// ── Sessions ─────────────────────────────────────────────────────────────────
+let _allSessions = [];
+let _sessionFilter = "all";
+
+function setSessionFilter(f) {
+  _sessionFilter = f;
+  document.querySelectorAll(".sf-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === f));
+  _renderSessionList();
+}
+
+function renderSessions(sessions) {
+  _allSessions = sessions;
+  document.getElementById("session-count").textContent = `(${sessions.length})`;
+  _renderSessionList();
+}
+
+function _filterSessions(sessions) {
+  if (_sessionFilter === "5")     return sessions.slice(0, 5);
+  if (_sessionFilter === "10")    return sessions.slice(0, 10);
+  if (_sessionFilter === "30min") {
+    const cutoff = Date.now() - 30 * 60 * 1000;
+    return sessions.filter(s => s.last_created && new Date(s.last_created).getTime() >= cutoff);
+  }
+  return sessions;
+}
+
+function _renderSessionList() {
+  const visible = _filterSessions(_allSessions);
+  const list = document.getElementById("session-list");
+  list.innerHTML = "";
+  if (!visible.length) {
+    list.innerHTML = '<div style="padding:16px;font-size:11px;color:#4a5568">No sessions match filter</div>';
+    return;
+  }
+  visible.forEach(s => {
+    const el = document.createElement("div");
+    el.className = "session-item" + (s.session_id === activeSession ? " active" : "");
+    const date = s.last_created ? new Date(s.last_created).toLocaleString() : "—";
+    el.innerHTML = `<div class="sid" title="${s.session_id}">${s.session_id}</div>
+      <div class="meta">${s.weapon_count} weapon${s.weapon_count !== 1 ? "s" : ""} · ${date}</div>`;
+    el.onclick = () => selectSession(s.session_id);
+    list.appendChild(el);
+  });
+}
+function selectSession(id) {
+  activeSession = id;
+  _systemWeapons = [];
+  _sessionWeapons = [];
+  document.getElementById("session-label").textContent = id;
+  document.querySelectorAll(".session-item").forEach(el =>
+    el.classList.toggle("active", (el.querySelector(".sid") || {}).title === id));
+
+  // Reset all panels
+  ["weapons","payloads","projectiles"].forEach(t => {
+    document.getElementById(`panel-${t}`).innerHTML = '<div id="empty-state">Loading…</div>';
+    document.getElementById(`ct-${t}-count`).textContent = "";
+  });
+
+  send("debug_get_system_weapons", {});
+  send("debug_get_weapons",        { session_id: id });
+  send("debug_get_payloads",       { session_id: id });
+  send("debug_get_projectiles",    { session_id: id });
+}
+
+// ── Content tab switcher ──────────────────────────────────────────────────────
+function switchContentTab(name) {
+  document.querySelectorAll(".ct-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll(".content-panel").forEach(p =>
+    p.classList.toggle("active", p.id === `panel-${name}`));
+  if (name === "pipeline") send("debug_get_pipeline_config", {});
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function tintCss(tint) {
+  return tint && tint.r != null
+    ? `rgba(${Math.round(tint.r*255)},${Math.round(tint.g*255)},${Math.round(tint.b*255)},${tint.a ?? 1})`
+    : null;
+}
+function weaponIconHtml(c, size) {
+  const fn = c.icon; if (!fn) return "no icon";
+  const t = tintCss((c.visual_stats || {}).tint_color);
+  return `<img src="app/data/baseimg_128/${fn}" style="width:${size}px;height:${size}px;object-fit:contain;image-rendering:pixelated;${t?`filter:drop-shadow(0 0 4px ${t})`:''}">`;
+}
+function projIconHtml(p, size) {
+  const t = tintCss((p.visual_stats || {}).tint_color);
+  const style = `width:${size}px;height:${size}px;object-fit:contain;image-rendering:pixelated;${t?`filter:drop-shadow(0 0 4px ${t})`:''}`;
+  if (p.icon_b64) return `<img src="data:image/png;base64,${p.icon_b64}" style="${style}">`;
+  if (p.icon)     return `<img src="app/data/projectile_base_img/${p.icon}" style="${style}">`;
+  return "no icon";
+}
+function syntaxHighlight(json) {
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (m) => {
+    let cls = "json-num";
+    if (/^"/.test(m)) cls = /:$/.test(m) ? "json-key" : "json-str";
+    else if (/true|false/.test(m)) cls = "json-bool";
+    else if (/null/.test(m)) cls = "json-null";
+    return `<span class="${cls}">${m}</span>`;
+  });
+}
+function countLabel(n, word) { return `(${n} ${word}${n !== 1 ? "s" : ""})`; }
+function _latestTime(items, field) {
+  let best = 0;
+  for (const it of items) {
+    const v = it[field]; if (!v) continue;
+    const t = new Date(v).getTime(); if (t > best) best = t;
+  }
+  if (!best) return "";
+  const d = new Date(best);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  if (sameDay) return ` · ${hh}:${mm}`;
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return ` · ${mo}/${dd} ${hh}:${mm}`;
+}
+
+// ── Weapon grid ───────────────────────────────────────────────────────────────
+function _renderWeaponPanel() {
+  const systemSorted  = [..._systemWeapons].sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+  const sessionSorted = [..._sessionWeapons].sort((a, b) => new Date(b.last_synced || 0) - new Date(a.last_synced || 0));
+  const total = systemSorted.length + sessionSorted.length;
+  const timeStr = _latestTime(sessionSorted, "last_synced");
+  document.getElementById("ct-weapons-count").textContent =
+    `(${systemSorted.length} preset · ${sessionSorted.length} generated${timeStr})`;
+
+  const panel = document.getElementById("panel-weapons");
+  panel.innerHTML = "";
+
+  if (!total) {
+    panel.innerHTML = '<div id="empty-state">No weapons in this session</div>';
+    return;
+  }
+
+  // ── System presets section ──
+  const sysHeader = document.createElement("div");
+  sysHeader.className = "weapon-section-header";
+  sysHeader.innerHTML = `<span>System Presets (${systemSorted.length})</span>`;
+  panel.appendChild(sysHeader);
+
+  if (systemSorted.length) {
+    systemSorted.forEach(w => {
+      const card = buildWeaponCard(w, true);
+      card.onclick = () => openWeaponModal(w);
+      panel.appendChild(card);
+    });
+  } else {
+    const empty = document.createElement("div");
+    empty.style.cssText = "grid-column:1/-1;font-size:11px;color:#4a5568;padding:8px 0";
+    empty.textContent = "Loading…";
+    panel.appendChild(empty);
+  }
+
+  // ── Divider ──
+  const hr = document.createElement("hr");
+  hr.className = "weapon-section-divider";
+  panel.appendChild(hr);
+
+  // ── Session-generated section ──
+  const genHeader = document.createElement("div");
+  genHeader.className = "weapon-section-header";
+  genHeader.innerHTML = `<span>In-Session Generated (${sessionSorted.length})</span>`;
+  panel.appendChild(genHeader);
+
+  if (sessionSorted.length) {
+    sessionSorted.forEach(w => {
+      const card = buildWeaponCard(w, false);
+      card.onclick = () => openWeaponModal(w);
+      panel.appendChild(card);
+    });
+  } else {
+    const empty = document.createElement("div");
+    empty.style.cssText = "grid-column:1/-1;font-size:11px;color:#4a5568;padding:8px 0";
+    empty.textContent = "No weapons generated yet this session";
+    panel.appendChild(empty);
+  }
+}
+function buildWeaponCard(w, isPreset = false) {
+  const c = w.content || {}, ab = c.abilities || {};
+  const payloads = [
+    ...(ab.on_hit    || []).map(p => `<span class="tag">${p}</span>`),
+    ...(ab.on_attack || []).map(p => `<span class="tag red">${p}</span>`),
+    ...(ab.on_equip  || []).map(p => `<span class="tag green">${p}</span>`),
+  ].join("") || '<span style="color:#4a5568;font-size:10px">none</span>';
+
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <div class="card-icon">${weaponIconHtml(c, 64)}</div>
+    <div class="card-body">
+      <div class="card-name">${c.name || w.id}</div>
+      <div class="card-id">${w.id || c.id || ""}</div>
+      <div class="card-row">
+        ${isPreset ? `<span class="tag preset">preset</span>` : ""}
+        ${w.biome ? `<span class="tag">${w.biome}</span>` : ""}
+        ${w.level != null ? `<span class="tag">Lv${w.level}</span>` : ""}
+        ${w.generation_time_secs != null ? `<span class="tag time">⏱ ${w.generation_time_secs}s</span>` : ""}
+        ${(()=>{ const tok = _totalTokens(w.node_traces); return tok ? `<span class="tag time">🔤 ${tok.toLocaleString()}</span>` : ""; })()}
+      </div>
+      <div class="card-row" style="margin-top:6px">${payloads}</div>
+      ${c.summary ? `<div style="font-size:10px;color:#718096;margin-top:6px;line-height:1.4">${c.summary}</div>` : ""}
+    </div>`;
+  return card;
+}
+
+// ── Payload grid ──────────────────────────────────────────────────────────────
+function renderPayloads(payloads) {
+  payloads = [...payloads].sort((a, b) => new Date(b.last_synced || 0) - new Date(a.last_synced || 0));
+  const timeStr = _latestTime(payloads, "last_synced");
+  document.getElementById("ct-payloads-count").textContent = `(${payloads.length} payload${payloads.length !== 1 ? "s" : ""}${timeStr})`;
+  const panel = document.getElementById("panel-payloads");
+  panel.innerHTML = "";
+  if (!payloads.length) { panel.innerHTML = '<div id="empty-state">No new payloads generated in this session</div>'; return; }
+  payloads.forEach(p => {
+    const card = buildPayloadCard(p);
+    card.onclick = () => openPayloadModal(p);
+    panel.appendChild(card);
+  });
+}
+function buildPayloadCard(p) {
+  const prims = (p.sequence || []).map(s => `<span class="tag green">${s.primitive_id}</span>`).join(" ");
+  const card = document.createElement("div");
+  card.className = "payload-card";
+  card.innerHTML = `
+    <div class="card-name" style="font-size:13px;font-weight:bold">${p.id}</div>
+    <div style="font-size:10px;color:#718096;margin:4px 0 8px">${p.description || ""}</div>
+    <div class="card-row">${prims || '<span style="color:#4a5568;font-size:10px">empty sequence</span>'}</div>`;
+  return card;
+}
+
+// ── Projectile grid ───────────────────────────────────────────────────────────
+function renderProjectiles(projectiles) {
+  projectiles = [...projectiles].sort((a, b) => new Date(b.last_synced || 0) - new Date(a.last_synced || 0));
+  const timeStr = _latestTime(projectiles, "last_synced");
+  document.getElementById("ct-projectiles-count").textContent = `(${projectiles.length} projectile${projectiles.length !== 1 ? "s" : ""}${timeStr})`;
+  const panel = document.getElementById("panel-projectiles");
+  panel.innerHTML = "";
+  if (!projectiles.length) { panel.innerHTML = '<div id="empty-state">No new projectiles generated in this session</div>'; return; }
+  projectiles.forEach(p => {
+    const card = buildProjectileCard(p);
+    card.onclick = () => openProjectileModal(p);
+    panel.appendChild(card);
+  });
+}
+function buildProjectileCard(p) {
+  const st  = p.stats || {};
+  const ab  = p.abilities || {};
+  const vs  = p.visual_stats || {};
+  const tint = vs.tint_color;
+  const swatchHtml = tintCss(tint)
+    ? `<span class="swatch" style="background:${tintCss(tint)}"></span>` : "";
+  const onHit = (ab.on_hit || []).map(id => `<span class="tag purple">${id}</span>`).join(" ")
+    || '<span style="color:#4a5568;font-size:10px">none</span>';
+
+  const card = document.createElement("div");
+  card.className = "proj-card";
+  card.innerHTML = `
+    <div class="card-icon">${projIconHtml(p, 64)}</div>
+    <div class="card-body">
+      <div class="card-name">${p.name || p.id}</div>
+      <div class="card-id">${p.id}</div>
+      <div class="card-row">
+        ${st.speed    != null ? `<span class="tag">spd ${st.speed}</span>` : ""}
+        ${st.lifetime != null ? `<span class="tag time">${st.lifetime}s</span>` : ""}
+        ${st.penetration > 0  ? `<span class="tag red">pen ${st.penetration}</span>` : ""}
+        ${st.collider_radius > 0.1 ? `<span class="tag orange">r=${st.collider_radius}</span>` : ""}
+        ${p.animation && p.animation.preset ? `<span class="tag">${p.animation.preset}</span>` : ""}
+        ${vs.scale != null && vs.scale !== 1 ? `<span class="tag">×${vs.scale}</span>` : ""}
+      </div>
+      <div class="card-row" style="margin-top:6px">${swatchHtml}${onHit}</div>
+    </div>`;
+  return card;
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function closeModal() {
+  document.getElementById("modal-overlay").classList.remove("open");
+  currentItem = null;
+}
+function _openModal(iconHtml, name, id, tabs, firstTab) {
+  document.getElementById("modal-icon").innerHTML  = iconHtml;
+  document.getElementById("modal-name").textContent = name;
+  document.getElementById("modal-id").textContent   = id;
+
+  // Build tab bar
+  const tabBar = document.getElementById("modal-tabs");
+  tabBar.innerHTML = tabs.map(([key, label]) =>
+    `<div class="tab-btn" onclick="modalSwitchTab('${key}')">${label}</div>`
+  ).join("");
+
+  document.getElementById("modal-body").innerHTML = tabs.map(([key]) =>
+    `<div id="mtab-${key}" class="tab-panel"></div>`
+  ).join("");
+
+  modalSwitchTab(firstTab);
+  document.getElementById("modal-overlay").classList.add("open");
+}
+function modalSwitchTab(name) {
+  document.querySelectorAll("#modal-tabs .tab-btn").forEach(b =>
+    b.classList.toggle("active", b.textContent.trim() ===
+      document.querySelector(`#modal-tabs .tab-btn[onclick="modalSwitchTab('${name}')"]`)?.textContent.trim()));
+  // simpler: toggle by onclick attr match
+  document.querySelectorAll("#modal-tabs .tab-btn").forEach(b =>
+    b.classList.toggle("active", b.getAttribute("onclick") === `modalSwitchTab('${name}')`));
+  document.querySelectorAll("#modal-body .tab-panel").forEach(p =>
+    p.classList.toggle("active", p.id === `mtab-${name}`));
+}
+
+// ─── Weapon modal ─────────────────────────────────────────────────────────────
+function openWeaponModal(w) {
+  currentItem = { type: "weapon", data: w };
+  const c  = w.content || {};
+  const st = c.stats || {};
+  const ab = c.abilities || {};
+  const vs = c.visual_stats || {};
+
+  const tabs = [["details","Details"],["abilities","Abilities"],["motions","Motions"],["timing","Timing"]];
+  if (w.node_traces && Object.keys(w.node_traces).length) tabs.push(["trace","Trace"]);
+  tabs.push(["json","Raw JSON"]);
+  _openModal(weaponIconHtml(c, 48), c.name || w.id, w.id, tabs, "details");
+
+  // Details
+  const tint = vs.tint_color || {};
+  const tintStr = tint.r != null ? `r=${tint.r} g=${tint.g} b=${tint.b} a=${tint.a}` : "—";
+  const tintSwatch = tintCss(tint) ? `<span class="swatch" style="background:${tintCss(tint)}"></span>` : "";
+  document.getElementById("mtab-details").innerHTML = `
+    <div class="detail-section"><h4>Meta</h4><div class="detail-grid">
+      <span class="k">session_id</span><span class="v">${w.session_id}</span>
+      <span class="k">biome</span>     <span class="v">${w.biome || "—"}</span>
+      <span class="k">level</span>     <span class="v">${w.level ?? "—"}</span>
+      <span class="k">gen time</span>  <span class="v">${w.generation_time_secs != null ? w.generation_time_secs + "s" : "—"}</span>
+      <span class="k">last_synced</span><span class="v">${w.last_synced || "—"}</span>
+    </div></div>
+    <div class="detail-section"><h4>Stats</h4><div class="detail-grid">
+      <span class="k">base_damage</span>  <span class="v">${st.base_damage ?? "—"}</span>
+      <span class="k">design_level</span> <span class="v">${st.design_level ?? "—"}</span>
+      <span class="k">range</span>        <span class="v">${st.range ?? "—"}</span>
+      <span class="k">cooldown</span>     <span class="v">${st.cooldown ?? "—"}s</span>
+      <span class="k">duration</span>     <span class="v">${st.duration ?? "—"}s</span>
+      <span class="k">hit_start/end</span><span class="v">${st.hit_start ?? "—"} / ${st.hit_end ?? "—"}</span>
+      ${st.projectile_id ? `<span class="k">projectile</span><span class="v">${st.projectile_id} ×${st.projectile_count ?? 1} spread=${st.spread_angle ?? 0}°</span>` : ""}
+    </div></div>
+    <div class="detail-section"><h4>Visual</h4><div class="detail-grid">
+      <span class="k">icon</span>        <span class="v">${c.icon || "—"}</span>
+      <span class="k">world_length</span><span class="v">${vs.world_length ?? "—"}</span>
+      <span class="k">scale</span>       <span class="v">${vs.scale ?? "—"}</span>
+      <span class="k">pivot</span>       <span class="v">${vs.pivot ? `(${vs.pivot.x}, ${vs.pivot.y})` : "—"}</span>
+      <span class="k">tint_color</span> <span class="v">${tintSwatch}${tintStr}</span>
+    </div></div>
+    ${c.summary ? `<div class="detail-section"><h4>Summary</h4><div style="font-size:12px;color:#a0aec0;line-height:1.6">${c.summary}</div></div>` : ""}`;
+
+  // Abilities
+  const abilityHtml = (trigger, ids, cls) =>
+    (ids || []).map(p => `<div class="payload-row"><span class="payload-trigger">${trigger}</span><span class="tag ${cls}">${p}</span></div>`).join("");
+  document.getElementById("mtab-abilities").innerHTML = `
+    <div class="detail-section"><h4>on_hit</h4>${abilityHtml("on_hit", ab.on_hit, "") || '<span style="color:#4a5568;font-size:12px">none</span>'}</div>
+    <div class="detail-section"><h4>on_attack</h4>${abilityHtml("on_attack", ab.on_attack, "red") || '<span style="color:#4a5568;font-size:12px">none</span>'}</div>
+    <div class="detail-section"><h4>on_equip</h4>${abilityHtml("on_equip", ab.on_equip, "green") || '<span style="color:#4a5568;font-size:12px">none</span>'}</div>`;
+
+  // Motions
+  const motions = c.motions || [];
+  document.getElementById("mtab-motions").innerHTML = motions.length
+    ? motions.map((m, i) => `<div class="motion-block">
+        <span style="color:#718096;font-size:10px">#${i+1}</span>
+        <span class="mid" style="margin-left:8px">${m.primitive_id || "?"}</span>
+        <div class="motion-params">${JSON.stringify(m.params || {}, null, 2)}</div>
+      </div>`).join("")
+    : '<span style="color:#4a5568;font-size:12px">No motions</span>';
+
+  // Timing
+  buildTimingContent("mtab-timing", w);
+
+  // JSON
+  document.getElementById("mtab-json").innerHTML =
+    `<button class="copy-btn-inline" onclick="copyCurrentJson()">Copy JSON</button>
+     <pre id="json-view">${syntaxHighlight(JSON.stringify(w, null, 2))}</pre>`;
+
+  // Trace
+  if (w.node_traces) _buildTraceTab(w.node_traces);
+}
+
+// ─── Trace tab ────────────────────────────────────────────────────────────────
+function _buildTraceTab(traces) {
+  const panel = document.getElementById("mtab-trace");
+  if (!panel) return;
+
+  const grandTotal = _totalTokens(traces);
+  panel.innerHTML = `
+    <div style="display:flex;flex-direction:column;height:100%;overflow:hidden">
+      ${grandTotal ? `<div style="padding:6px 10px;background:#1a1a2e;border-bottom:1px solid #0f3460;font-size:11px;color:#9f7aea">Total tokens: <strong>${grandTotal.toLocaleString()}</strong></div>` : ""}
+      <div style="display:flex;flex:1;gap:0;overflow:hidden">
+        <div id="trace-node-list" style="width:175px;flex-shrink:0;border-right:1px solid #0f3460;overflow-y:auto;padding:8px 6px"></div>
+        <div id="trace-detail-panel" style="flex:1;overflow-y:auto;padding:12px"></div>
+      </div>
+    </div>`;
+
+  const list = document.getElementById("trace-node-list");
+  const detail = document.getElementById("trace-detail-panel");
+  detail.innerHTML = '<div style="color:#4a5568;font-size:12px;padding:16px">Select a node to inspect</div>';
+
+  PIPELINE_NODES_FLAT.forEach(node => {
+    const trace = traces[node.id];
+    const el = document.createElement("div");
+    el.className = "trace-node-item" + (trace ? " trace-ran" : " trace-skipped");
+    el.innerHTML = `
+      <span class="trace-node-name">${node.label}</span>
+      ${trace?.duration_secs != null ? `<span class="trace-duration">${trace.duration_secs}s</span>` : ""}
+      ${trace?.tokens?.total ? `<span class="trace-duration" style="color:#9f7aea">${trace.tokens.total.toLocaleString()}t</span>` : ""}`;
+    if (trace) {
+      el.onclick = () => {
+        list.querySelectorAll(".trace-node-item").forEach(e => e.classList.remove("selected"));
+        el.classList.add("selected");
+        _showTraceDetail(detail, node.id, trace);
+      };
+    }
+    list.appendChild(el);
+  });
+}
+
+function _totalTokens(nodeTraces) {
+  if (!nodeTraces) return 0;
+  let total = 0;
+  for (const t of Object.values(nodeTraces)) total += (t?.tokens?.total || 0);
+  return total;
+}
+
+function _showTraceDetail(container, name, trace) {
+  const dur = trace.duration_secs != null
+    ? `<span style="color:#f6e05e;font-size:11px;margin-left:8px">⏱ ${trace.duration_secs}s</span>` : "";
+  const tok = trace.tokens;
+  const tokHtml = tok ? `<span style="color:#9f7aea;font-size:11px;margin-left:8px" title="prompt: ${tok.prompt}  completion: ${tok.completion}">🔤 ${tok.total.toLocaleString()} tokens (↑${tok.prompt} ↓${tok.completion})</span>` : "";
+  const inputsBody  = trace.inputs  ? _renderStateTable(trace.inputs)  : '<div class="sv-empty">—</div>';
+  const outputsBody = trace.outputs ? _renderStateTable(trace.outputs) : '<div class="sv-empty">—</div>';
+  container.innerHTML = `
+    <div class="pdetail-node-name">${name}${dur}${tokHtml}</div>
+    ${_buildCollapsible("Inputs",  inputsBody,  true)}
+    ${_buildCollapsible("Outputs", outputsBody, true)}`;
+}
+
+// ─── Payload modal ────────────────────────────────────────────────────────────
+function openPayloadModal(p) {
+  currentItem = { type: "payload", data: p };
+  _openModal(
+    `<span style="font-size:22px">📦</span>`,
+    p.id, `${(p.sequence || []).length} primitive(s)`,
+    [["sequence","Sequence"],["json","Raw JSON"]], "sequence"
+  );
+
+  // Sequence
+  const seq = p.sequence || [];
+  document.getElementById("mtab-sequence").innerHTML = seq.length
+    ? seq.map((s, i) => `<div class="prim-block">
+        <span style="color:#718096;font-size:10px">#${i+1}</span>
+        <span class="pid" style="margin-left:8px">${s.primitive_id || "?"}</span>
+        <div class="prim-params">${JSON.stringify(s.params || {}, null, 2)}</div>
+      </div>`).join("")
+    : '<span style="color:#4a5568;font-size:12px">Empty sequence</span>';
+
+  // JSON
+  document.getElementById("mtab-json").innerHTML =
+    `<button class="copy-btn-inline" onclick="copyCurrentJson()">Copy JSON</button>
+     <pre id="json-view">${syntaxHighlight(JSON.stringify(p, null, 2))}</pre>`;
+}
+
+// ─── Projectile modal ─────────────────────────────────────────────────────────
+function openProjectileModal(p) {
+  currentItem = { type: "projectile", data: p };
+  const st = p.stats || {};
+  const vs = p.visual_stats || {};
+  const tint = vs.tint_color || {};
+  const tintStr = tint.r != null ? `r=${tint.r} g=${tint.g} b=${tint.b} a=${tint.a ?? 1}` : "—";
+  const tintSwatch = tintCss(tint) ? `<span class="swatch" style="background:${tintCss(tint)}"></span>` : "";
+
+  _openModal(
+    projIconHtml(p, 48), p.name || p.id, p.id,
+    [["details","Details"],["abilities","Abilities"],["json","Raw JSON"]], "details"
+  );
+
+  // Details
+  document.getElementById("mtab-details").innerHTML = `
+    <div class="detail-section"><h4>Stats</h4><div class="detail-grid">
+      <span class="k">speed</span>           <span class="v">${st.speed ?? "—"} u/s</span>
+      <span class="k">lifetime</span>        <span class="v">${st.lifetime ?? "—"}s</span>
+      <span class="k">penetration</span>     <span class="v">${st.penetration ?? 0}</span>
+      <span class="k">collider_radius</span> <span class="v">${st.collider_radius ?? 0.1}</span>
+    </div></div>
+    <div class="detail-section"><h4>Visual</h4><div class="detail-grid">
+      <span class="k">icon</span>       <span class="v">${p.icon || "—"}</span>
+      <span class="k">preset</span>    <span class="v">${(p.animation || {}).preset || "—"}</span>
+      <span class="k">scale</span>     <span class="v">${vs.scale ?? "—"}</span>
+      <span class="k">tint_color</span><span class="v">${tintSwatch}${tintStr}</span>
+    </div></div>`;
+
+  // Abilities
+  const ab = p.abilities || {};
+  const onHit = (ab.on_hit || []).map(id =>
+    `<div class="payload-row"><span class="payload-trigger">on_hit</span><span class="tag purple">${id}</span></div>`
+  ).join("") || '<span style="color:#4a5568;font-size:12px">none</span>';
+  document.getElementById("mtab-abilities").innerHTML =
+    `<div class="detail-section"><h4>on_hit</h4>${onHit}</div>`;
+
+  // JSON — strip icon_b64 to keep it readable
+  const display = {...p}; delete display.icon_b64;
+  document.getElementById("mtab-json").innerHTML =
+    `<button class="copy-btn-inline" onclick="copyCurrentJson()">Copy JSON</button>
+     <pre id="json-view">${syntaxHighlight(JSON.stringify(display, null, 2))}</pre>`;
+}
+
+// ─── Timing ───────────────────────────────────────────────────────────────────
+function buildTimingContent(panelId, w) {
+  const timings = w.node_timings || {};
+  const total   = w.generation_time_secs;
+  const entries = Object.entries(timings).sort((a, b) => b[1] - a[1]);
+  const panel = document.getElementById(panelId);
+  if (!entries.length) {
+    panel.innerHTML = '<div style="color:#4a5568;font-size:12px;padding:20px">No timing data.</div>';
+    return;
+  }
+  const max = Math.max(...entries.map(e => e[1]));
+  const bars = entries.map(([name, secs]) => {
+    const pct   = max > 0 ? Math.round((secs / max) * 100) : 0;
+    const color = secs > 10 ? "#e94560" : secs > 4 ? "#f6ad55" : "#68d391";
+    return `<div class="timing-row">
+      <div class="timing-label">${name}</div>
+      <div class="timing-bar-wrap"><div class="timing-bar" style="width:${pct}%;background:${color}"></div></div>
+      <div class="timing-val">${secs}s</div>
+    </div>`;
+  }).join("");
+  const totalRow = total != null
+    ? `<div class="timing-total"><span>Total (wall clock)</span><span>${total}s</span></div>` : "";
+  panel.innerHTML = bars + totalRow;
+}
+
+// ─── Copy JSON ────────────────────────────────────────────────────────────────
+function copyCurrentJson() {
+  if (!currentItem) return;
+  navigator.clipboard.writeText(JSON.stringify(currentItem.data, null, 2));
+  document.querySelectorAll(".copy-btn-inline").forEach(b => {
+    b.textContent = "Copied!";
+    setTimeout(() => b.textContent = "Copy JSON", 1500);
+  });
+}
+
+// Close on backdrop / Escape
+document.getElementById("modal-overlay").addEventListener("click", (e) => {
+  if (e.target === document.getElementById("modal-overlay")) closeModal();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+
+// Inline copy-btn style (injected once)
+const _style = document.createElement("style");
+_style.textContent = `.copy-btn-inline { margin: 0 0 10px; padding: 6px 14px; background: #0f3460; border: 1px solid #1e4080; border-radius: 6px; color: #90cdf4; font-size: 11px; cursor: pointer; display: inline-block; } .copy-btn-inline:hover { background: #1e4080; } #json-view { background: #0d1117; border-radius: 6px; padding: 14px; font-size: 11px; line-height: 1.6; white-space: pre; overflow-x: auto; display: block; }`;
+document.head.appendChild(_style);
+
+// ── Pipeline visualization ────────────────────────────────────────────────────
+
+// ── Node definitions (shared across all layouts) ─────────────────────────────
+const _ND = {
+  db_retrieval:       { id: "db_retrieval",       label: "DB Retrieval",        desc: "Load reference weapons" },
+  input_cache:        { id: "input_cache",         label: "Input Cache",         desc: "Check materials hash" },
+  designer:           { id: "designer",            label: "Designer",            desc: "Concept design · LLM" },
+  concept_reviewer:   { id: "concept_reviewer",    label: "Concept Reviewer",    desc: "Audit design idea · LLM" },
+  cache_check:        { id: "cache_check",         label: "Cache Check",         desc: "Check payload/projectile cache" },
+  payload_factory:    { id: "payload_factory",     label: "Payload Factory",     desc: "Generate payload · LLM" },
+  projectile_factory: { id: "projectile_factory",  label: "Projectile Factory",  desc: "Generate projectile · LLM" },
+  weapon_designer:    { id: "weapon_designer",     label: "Weapon Designer",     desc: "Craft weapon stats · LLM" },
+  payload_validator:  { id: "payload_validator",   label: "Payload Validator",   desc: "Validate payload IDs" },
+  power_budget:       { id: "power_budget",        label: "Power Budget",        desc: "Scale damage to world level" },
+  artist:             { id: "artist",              label: "Artist",              desc: "Generate weapon icon" },
+};
+
+// Per-mode layouts. Array entries: node object (sequential) | array of nodes (parallel group).
+// tech_auditor / weapon_patcher intentionally excluded (disabled in pipeline).
+const PIPELINE_LAYOUTS = {
+  serial: [
+    _ND.db_retrieval, _ND.input_cache, _ND.designer, _ND.concept_reviewer, _ND.cache_check,
+    [_ND.payload_factory, _ND.projectile_factory],   // conditional serial factories
+    _ND.weapon_designer, _ND.payload_validator, _ND.power_budget, _ND.artist,
+  ],
+  factory_parallel: [
+    _ND.db_retrieval, _ND.input_cache, _ND.designer, _ND.concept_reviewer, _ND.cache_check,
+    [_ND.payload_factory, _ND.projectile_factory],   // factories run in parallel
+    [_ND.weapon_designer, _ND.artist],               // weapon + artist run in parallel
+    _ND.payload_validator, _ND.power_budget,
+  ],
+  full_parallel: [
+    _ND.db_retrieval, _ND.input_cache, _ND.designer, _ND.concept_reviewer, _ND.cache_check,
+    // concept_fork fans out to all four simultaneously
+    [_ND.payload_factory, _ND.projectile_factory, _ND.weapon_designer, _ND.artist],
+    _ND.payload_validator, _ND.power_budget,
+  ],
+};
+
+// Active layout — updated by applyPipelineConfig when mode is known
+let PIPELINE_NODES = PIPELINE_LAYOUTS.serial;
+let PIPELINE_NODES_FLAT = _flatNodes(PIPELINE_NODES);
+
+function _flatNodes(layout) {
+  return layout.flatMap(item => Array.isArray(item) ? item : [item]);
+}
+
+// node_name -> { inputs, outputs, tokens, startMs }
+const pipelineNodeStore = {};
+// arrow DOM elements indexed by gap between PIPELINE_NODES[i] and PIPELINE_NODES[i+1]
+const pipelineArrows = [];
+// active timer intervals: node_name -> intervalId
+const _nodeTimers = {};
+let pipelineSelectedNode = null;
+let pipelineAutoFollow = true;
+
+function buildPipelineDag() {
+  const container = document.getElementById("pipeline-dag");
+  container.querySelectorAll(".pipeline-node, .pipeline-arrow, .pipeline-parallel-group").forEach(el => el.remove());
+  pipelineArrows.length = 0;
+  PIPELINE_NODES.forEach((item, idx) => {
+    if (Array.isArray(item)) {
+      const group = document.createElement("div");
+      group.className = "pipeline-parallel-group";
+      item.forEach(node => group.appendChild(_buildNodeEl(node)));
+      container.appendChild(group);
+    } else {
+      container.appendChild(_buildNodeEl(item));
+    }
+    if (idx < PIPELINE_NODES.length - 1) {
+      const arrow = document.createElement("div");
+      arrow.className = "pipeline-arrow";
+      arrow.textContent = "↓";
+      container.appendChild(arrow);
+      pipelineArrows.push(arrow);
+    }
+  });
+}
+
+function _buildNodeEl(node) {
+  const el = document.createElement("div");
+  el.className = "pipeline-node node-idle";
+  el.id = `pnode-${node.id}`;
+  el.innerHTML = `
+    <div class="pnode-label">${node.label}</div>
+    <div class="pnode-desc">${node.desc}</div>
+    <div class="pnode-time" id="ptime-${node.id}"></div>`;
+  el.onclick = () => selectPipelineNode(node.id);
+  return el;
+}
+
+function resetPipelineNodes() {
+  Object.keys(pipelineNodeStore).forEach(k => delete pipelineNodeStore[k]);
+  Object.entries(_nodeTimers).forEach(([, id]) => clearInterval(id));
+  Object.keys(_nodeTimers).forEach(k => delete _nodeTimers[k]);
+  document.querySelectorAll(".pipeline-node").forEach(el => el.className = "pipeline-node node-idle");
+  document.querySelectorAll(".pnode-time").forEach(el => el.textContent = "");
+  pipelineArrows.forEach(a => a.classList.remove("arrow-active"));
+  document.getElementById("pipeline-stream-log").innerHTML = "";
+  document.getElementById("pipeline-detail-content").innerHTML = "";
+  document.getElementById("pipeline-detail-placeholder").style.display = "";
+  document.getElementById("pipeline-detail-content").style.display = "none";
+  pipelineSelectedNode = null;
+}
+
+// Light up the arrow just before `nodeName` in the DAG
+function _activateArrowTo(nodeName) {
+  const idx = PIPELINE_NODES.findIndex(item =>
+    Array.isArray(item) ? item.some(n => n.id === nodeName) : item.id === nodeName);
+  if (idx > 0 && pipelineArrows[idx - 1]) pipelineArrows[idx - 1].classList.add("arrow-active");
+}
+
+// Start a live elapsed-time counter inside the node box
+function _startNodeTimer(name) {
+  if (_nodeTimers[name]) clearInterval(_nodeTimers[name]);
+  const startMs = pipelineNodeStore[name]?.startMs ?? Date.now();
+  _nodeTimers[name] = setInterval(() => {
+    const el = document.getElementById(`ptime-${name}`);
+    if (el) el.textContent = ((Date.now() - startMs) / 1000).toFixed(1) + "s";
+  }, 200);
+}
+
+function _stopNodeTimer(name, finalSecs) {
+  if (_nodeTimers[name]) { clearInterval(_nodeTimers[name]); delete _nodeTimers[name]; }
+  const el = document.getElementById(`ptime-${name}`);
+  if (el) el.textContent = finalSecs != null ? finalSecs + "s" : "";
+}
+
+function _setNodeState(name, state) {
+  const el = document.getElementById(`pnode-${name}`);
+  if (!el) return;
+  const selected = el.classList.contains("node-selected");
+  el.className = `pipeline-node node-${state}${selected ? " node-selected" : ""}`;
+}
+
+function selectPipelineNode(name) {
+  pipelineSelectedNode = name;
+  document.querySelectorAll(".pipeline-node").forEach(el =>
+    el.classList.toggle("node-selected", el.id === `pnode-${name}`));
+  _renderNodeDetail(name);
+}
+
+function _renderNodeDetail(name) {
+  const store = pipelineNodeStore[name];
+  const placeholder = document.getElementById("pipeline-detail-placeholder");
+  const content = document.getElementById("pipeline-detail-content");
+  if (!store) {
+    placeholder.style.display = "";
+    content.style.display = "none";
+    return;
+  }
+  placeholder.style.display = "none";
+  content.style.display = "";
+
+  const inputsBody  = store.inputs  ? _renderStateTable(store.inputs)
+                                    : '<div class="sv-empty">—</div>';
+  const outputsBody = store.outputs ? _renderStateTable(store.outputs)
+                                    : '<div class="sv-empty">Not finished yet</div>';
+
+  content.innerHTML = `
+    <div class="pdetail-node-name">${name}</div>
+    ${_buildCollapsible("Inputs",  inputsBody,  true)}
+    ${_buildCollapsible("Outputs", outputsBody, true)}`;
+}
+
+function _buildCollapsible(title, bodyHtml, open) {
+  const id = "col-" + Math.random().toString(36).slice(2, 8);
+  return `
+    <div class="col-section">
+      <div class="col-hdr ${open ? "open" : ""}" onclick="toggleCollapse('${id}')">
+        <span class="col-arrow">▶</span>${title}
+      </div>
+      <div class="col-body" id="${id}" ${open ? "" : 'style="display:none"'}>${bodyHtml}</div>
+    </div>`;
+}
+
+function toggleCollapse(id) {
+  const body = document.getElementById(id);
+  if (!body) return;
+  const hdr = body.previousElementSibling;
+  const nowOpen = body.style.display === "none";
+  body.style.display = nowOpen ? "" : "none";
+  hdr.classList.toggle("open", nowOpen);
+}
+
+function _escHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function _renderValue(v) {
+  if (v === null || v === undefined) return '<span class="v-null">null</span>';
+  if (typeof v === "boolean")  return `<span class="v-bool">${v}</span>`;
+  if (typeof v === "number")   return `<span class="v-num">${v}</span>`;
+  if (typeof v === "string") {
+    if (v.length > 300) return `<span class="v-long">${_escHtml(v.slice(0, 300))}…</span>`;
+    return `<span class="v-str">${_escHtml(v)}</span>`;
+  }
+  if (typeof v === "object") {
+    const json = JSON.stringify(v, null, 2);
+    const display = json.length > 800 ? json.slice(0, 800) + "\n…" : json;
+    return `<pre class="v-json">${syntaxHighlight(display)}</pre>`;
+  }
+  return `<span class="v-str">${_escHtml(String(v))}</span>`;
+}
+
+function _renderStateTable(obj) {
+  if (!obj || typeof obj !== "object") return `<div class="sv-row"><div class="sv-val">${_renderValue(obj)}</div></div>`;
+  const entries = Object.entries(obj);
+  if (!entries.length) return '<div class="sv-empty">empty</div>';
+  return entries.map(([k, v]) => `
+    <div class="sv-row">
+      <span class="sv-key">${_escHtml(k)}</span>
+      <div class="sv-val">${_renderValue(v)}</div>
+    </div>`).join("");
+}
+
+function handlePipelineProgress(payload) {
+  const { type, node, token, inputs, outputs, error, duration_secs } = payload;
+  switch (type) {
+    case "pipeline_start":
+      if (payload.config) applyPipelineConfig(payload.config);
+      resetPipelineNodes();
+      break;
+    case "node_start":
+      pipelineNodeStore[node] = { inputs: inputs || null, outputs: null, tokens: "", startMs: Date.now() };
+      _setNodeState(node, "active");
+      _activateArrowTo(node);
+      _startNodeTimer(node);
+      _appendStreamSection(node);
+      if (pipelineAutoFollow) selectPipelineNode(node);
+      break;
+    case "node_end":
+      if (pipelineNodeStore[node]) pipelineNodeStore[node].outputs = outputs || null;
+      _setNodeState(node, "done");
+      _stopNodeTimer(node, duration_secs);
+      _deactivateStream(node);
+      if (pipelineSelectedNode === node) _renderNodeDetail(node);
+      break;
+    case "pipeline_end":
+      // Auto-refresh the active session's data and the session list
+      if (activeSession) {
+        send("debug_get_weapons",     { session_id: activeSession });
+        send("debug_get_payloads",    { session_id: activeSession });
+        send("debug_get_projectiles", { session_id: activeSession });
+      }
+      send("debug_list_sessions", {});
+      break;
+    case "node_error":
+      _stopNodeTimer(node, duration_secs);
+      _setNodeState(node, "error");
+      if (pipelineSelectedNode === node) _renderNodeDetail(node);
+      break;
+    case "token":
+      if (!pipelineNodeStore[node]) pipelineNodeStore[node] = { inputs: null, outputs: null, tokens: "", startMs: Date.now() };
+      pipelineNodeStore[node].tokens += token;
+      _appendStreamToken(node, token);
+      break;
+  }
+}
+
+function _appendStreamSection(node) {
+  const log = document.getElementById("pipeline-stream-log");
+  if (document.getElementById(`stream-${node}`)) return; // already exists (e.g. retry)
+  const section = document.createElement("div");
+  section.className = "stream-section active-section";
+  section.id = `stream-${node}`;
+  section.innerHTML = `<div class="stream-node-label">${node}</div><div class="stream-tokens" id="stream-tokens-${node}"></div>`;
+  log.appendChild(section);
+  log.scrollTop = log.scrollHeight;
+}
+
+function _appendStreamToken(node, token) {
+  let el = document.getElementById(`stream-tokens-${node}`);
+  if (!el) { _appendStreamSection(node); el = document.getElementById(`stream-tokens-${node}`); }
+  if (!el) return;
+  el.textContent += token;
+  const log = document.getElementById("pipeline-stream-log");
+  log.scrollTop = log.scrollHeight;
+}
+
+// Mark finished stream sections as inactive
+function _deactivateStream(node) {
+  const sec = document.getElementById(`stream-${node}`);
+  if (sec) sec.classList.remove("active-section");
+}
+
+// ── Pipeline config ───────────────────────────────────────────────────────────
+
+// Nodes disabled by each flag
+const _SKIP_IDEA_NODES  = new Set(["concept_reviewer"]);
+const _SKIP_TECH_NODES  = new Set(["tech_auditor", "weapon_patcher"]);
+const _SKIP_CACHE_NODES = new Set(["input_cache"]);
+
+function applyPipelineConfig(cfg) {
+  // Rebuild DAG if workflow mode changed
+  const mode = cfg.workflow_mode || "serial";
+  const newLayout = PIPELINE_LAYOUTS[mode] || PIPELINE_LAYOUTS.serial;
+  if (PIPELINE_NODES !== newLayout) {
+    PIPELINE_NODES = newLayout;
+    PIPELINE_NODES_FLAT = _flatNodes(PIPELINE_NODES);
+    buildPipelineDag();
+  }
+
+  // Mark skipped nodes
+  const skipped = new Set();
+  if (cfg.skip_idea_audit)  _SKIP_IDEA_NODES.forEach(n  => skipped.add(n));
+  if (cfg.skip_tech_audit)  _SKIP_TECH_NODES.forEach(n  => skipped.add(n));
+  if (cfg.skip_input_cache) _SKIP_CACHE_NODES.forEach(n => skipped.add(n));
+  document.querySelectorAll(".pipeline-node").forEach(el => {
+    const name = el.id.replace("pnode-", "");
+    el.classList.toggle("node-skipped", skipped.has(name));
+  });
+
+  const badge = document.getElementById("pipeline-mode-badge");
+  if (badge) badge.textContent = mode;
+}
+
+// ── Resize handles ────────────────────────────────────────────────────────────
+(function initResize() {
+  let state = null; // { handle, leftEl, startX, startW }
+
+  // Map each handle id to the element it resizes (the panel to its left)
+  const handleMap = {
+    "sidebar-rh": "sidebar",
+    "dag-rh":     "pipeline-dag",
+    "detail-rh":  "pipeline-detail-panel",
+  };
+
+  Object.entries(handleMap).forEach(([rhId, panelId]) => {
+    const rh = document.getElementById(rhId);
+    if (!rh) return;
+    rh.addEventListener("mousedown", e => {
+      const panel = document.getElementById(panelId);
+      if (!panel) return;
+      state = { rh, panel, startX: e.clientX, startW: panel.offsetWidth };
+      rh.classList.add("rh-active");
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      e.preventDefault();
+    });
+  });
+
+  document.addEventListener("mousemove", e => {
+    if (!state) return;
+    const newW = Math.max(120, state.startW + (e.clientX - state.startX));
+    state.panel.style.width = newW + "px";
+    state.panel.style.minWidth = "0"; // allow shrinking below CSS min-width
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (!state) return;
+    state.rh.classList.remove("rh-active");
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    state = null;
+  });
+})();
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildPipelineDag();
+document.getElementById("pipeline-auto-follow").addEventListener("change", e => {
+  pipelineAutoFollow = e.target.checked;
+});
+
+connect();
+</script>
+</body>
+</html>

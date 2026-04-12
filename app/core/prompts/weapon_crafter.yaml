@@ -48,10 +48,19 @@ template: |
   - `abilities.on_attack`: MUST be ["payload_shoot_generic"] — the engine reads projectile_id from stats at runtime.
   - `abilities.on_hit`: Leave [] for pure ranged weapons (projectile handles its own on_hit payloads).
 
-  ### Melee Weapon Stats
+  ### Melee Weapon Stats (weapon_type = "melee", no projectile)
   - `stats.projectile_id`: Leave null (omit entirely).
-  - `abilities.on_attack`: Leave [] unless the weapon also fires a blade wave (sword qi).
-  - `abilities.on_hit`: Payload IDs for direct contact effects.
+  - `stats.hit_start` and `stats.hit_end`: Set to the physical hit window (e.g. 0.2 and 0.8). Never 0.
+  - `abilities.on_attack`: Leave [].
+  - `abilities.on_hit`: Payload IDs for direct contact effects (e.g. ["payload_strike", "payload_dot_fire"]).
+
+  ### Melee + Shockwave Stats (weapon_type = "melee", projectile_id is set)
+  This weapon BOTH swings and fires a projectile (shockwave/energy wave) every attack.
+  - `stats.projectile_id`: MUST equal the blueprint's `chosen_projectile_id`.
+  - `stats.hit_start` and `stats.hit_end`: KEEP > 0 (physical contact hitbox must remain). NEVER set to 0.
+  - `stats.hit_start` / `stats.hit_end`: e.g. 0.2 / 0.7 — the wave fires at attack start, the swing hits mid-way.
+  - `abilities.on_hit`: ["payload_strike", ...other contact effects] — triggered on direct physical contact.
+  - `abilities.on_attack`: ["payload_shoot_generic"] — fires the shockwave projectile at attack start.
 
   ### Instructions for Structured Output
   Think step-by-step before finalizing the data:

@@ -1,0 +1,24 @@
+{
+  "id": "payload_explode",
+  "description": "Deals heavy physical damage and knocks back all targets caught in the blast radius.",
+  "sequence": [
+    {
+      "primitive_id": "OP_MODIFY_HP",
+      "params": {
+        "value": 1.5,
+        "source": "weapon_multiplier",
+        "category": "damage",
+        "tag": "physical",
+        "target_type": "target"
+      }
+    },
+    {
+      "primitive_id": "OP_APPLY_FORCE",
+      "params": {
+        "magnitude": 20.0,
+        "direction_mode": "FromColliderCenter",
+        "target_type": "target"
+      }
+    }
+  ]
+}

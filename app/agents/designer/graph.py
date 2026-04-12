@@ -213,13 +213,17 @@ class DesignBlueprint(BaseModel):
                 if isinstance(step, dict)
             )
 
+        # Melee base damage — always inject payload_strike for contact weapons,
+        # even when the weapon also fires a shockwave projectile.
         if self.weapon_type == "melee":
             has_damage = any(_has_toplevel_primitive(pid, "OP_MODIFY_HP") for pid in self.chosen_payload_ids)
             if not has_damage and "payload_strike" in known:
                 self.chosen_payload_ids = ["payload_strike"] + self.chosen_payload_ids
                 print("[DesignBlueprint] Auto-injected payload_strike as base melee damage.")
-        elif self.weapon_type == "ranged":
-            # payload_shoot_generic is engine built-in — not on disk, always inject for ranged
+
+        # Ranged weapons always fire via on_attack.
+        # payload_shoot_generic is engine built-in — not on disk, always inject for ranged.
+        if self.weapon_type == "ranged":
             if "payload_shoot_generic" not in self.chosen_payload_ids:
                 self.chosen_payload_ids = ["payload_shoot_generic"] + self.chosen_payload_ids
                 print("[DesignBlueprint] Auto-injected payload_shoot_generic for ranged weapon.")
@@ -249,6 +253,15 @@ class DesignBlueprint(BaseModel):
         else:
             # No spawn payload → projectile_id is irrelevant
             self.chosen_projectile_id = None
+
+        # Fix 6: melee weapons that ended up with a projectile (shockwave / energy wave)
+        # need payload_shoot_generic in on_attack so Unity knows to fire it.
+        # This runs after Fix 5 so chosen_projectile_id is already validated.
+        if (self.weapon_type == "melee"
+                and self.chosen_projectile_id
+                and "payload_shoot_generic" not in self.chosen_payload_ids):
+            self.chosen_payload_ids = self.chosen_payload_ids + ["payload_shoot_generic"]
+            print("[DesignBlueprint] Auto-injected payload_shoot_generic for melee weapon with projectile.")
 
         return self
 

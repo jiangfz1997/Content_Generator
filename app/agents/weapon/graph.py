@@ -102,15 +102,25 @@ Output ONLY the fields that need to change."""),
         else:
             chosen_payloads_str = "(none specified — choose from the engine manual)"
 
-        # Projectile context for ranged weapons
+        # Projectile context — both ranged and melee-with-shockwave can have a projectile
         chosen_projectile_id = concept.get("chosen_projectile_id")
-        projectile_hint = (
-            f"This weapon fires projectile: **{chosen_projectile_id}**. "
-            f"Set stats.projectile_id = \"{chosen_projectile_id}\". "
-            f"Set stats.hit_start = 0, stats.hit_end = 0."
-            if chosen_projectile_id else
-            "Melee weapon — no projectile. Leave stats.projectile_id null."
-        )
+        weapon_type = concept.get("weapon_type", "melee")
+        if chosen_projectile_id:
+            if weapon_type == "ranged":
+                projectile_hint = (
+                    f"This weapon fires projectile: **{chosen_projectile_id}**. "
+                    f"Set stats.projectile_id = \"{chosen_projectile_id}\". "
+                    f"Set stats.hit_start = 0, stats.hit_end = 0 (no physical hitbox — projectile handles damage)."
+                )
+            else:
+                projectile_hint = (
+                    f"This melee weapon ALSO emits a shockwave projectile: **{chosen_projectile_id}**. "
+                    f"Set stats.projectile_id = \"{chosen_projectile_id}\". "
+                    f"KEEP hit_start and hit_end > 0 (physical contact hitbox must remain). "
+                    f"on_hit = [payload_strike, ...], on_attack = [payload_shoot_generic]."
+                )
+        else:
+            projectile_hint = "Pure melee weapon — no projectile. Leave stats.projectile_id null."
 
         try:
             weapon_obj: WeaponSchema = await self.chain.ainvoke({
@@ -137,9 +147,12 @@ Output ONLY the fields that need to change."""),
             # Never trust the LLM to copy it correctly into stats.projectile_id.
             if chosen_projectile_id:
                 weapon_dict.setdefault("stats", {})["projectile_id"] = chosen_projectile_id
-                weapon_dict["stats"]["hit_start"] = 0.0
-                weapon_dict["stats"]["hit_end"] = 0.0
-                print(f"[CraftingNode] Overrode stats.projectile_id → {chosen_projectile_id}")
+                if weapon_type == "ranged":
+                    # Ranged weapons have no physical hitbox — projectile handles all damage.
+                    weapon_dict["stats"]["hit_start"] = 0.0
+                    weapon_dict["stats"]["hit_end"] = 0.0
+                # Melee+projectile: preserve LLM-generated hit_start/hit_end for physical contact window.
+                print(f"[CraftingNode] Overrode stats.projectile_id → {chosen_projectile_id} (weapon_type={weapon_type})")
 
             return {"final_output": weapon_dict, "generation_history": state.get("generation_history", [])}
         except Exception as e:
@@ -177,10 +190,13 @@ Output ONLY the fields that need to change."""),
             # Re-apply projectile_id override in case patcher stomped it
             concept = state.get("design_concept") or {}
             proj_id = concept.get("chosen_projectile_id")
+            w_type  = concept.get("weapon_type", "melee")
             if proj_id:
                 patched_weapon.setdefault("stats", {})["projectile_id"] = proj_id
-                patched_weapon["stats"]["hit_start"] = 0.0
-                patched_weapon["stats"]["hit_end"] = 0.0
+                if w_type == "ranged":
+                    patched_weapon["stats"]["hit_start"] = 0.0
+                    patched_weapon["stats"]["hit_end"] = 0.0
+                # Melee+projectile: do not zero out hit window.
 
             print(f"[PatchNode] repair done: {patch_result.patch_analysis}")
             return {"final_output": patched_weapon}

@@ -20,8 +20,41 @@ from app.utils.callbacks import make_callbacks
 
 
 class IconSelection(BaseModel):
-    selected_filename: str = Field(description="Exact filename from the available list, e.g. 'sword_long.png'")
-    reasoning: str = Field(description="One sentence: why this base image fits the weapon concept.")
+    reasoning: str = Field(description="One sentence: why this category and image fit the weapon concept.")
+    selected_category: str = Field(description="Subdirectory category name, e.g. 'melee', 'range', 'guns'")
+    selected_filename: str = Field(description="Exact filename within that category, e.g. 'sword1normal_crop.png'")
+
+# ---------------------------------------------------------------------------
+# Base-image registry — scanned once at startup from all subdirs of BASEIMG_DIR
+# Structure: { "melee": ["axe1_crop.png", ...], "range": ["bow_crop.png", ...], ... }
+# Adding a new subdir to baseimg_128/ is all that's needed to extend the registry.
+# ---------------------------------------------------------------------------
+_IMG_EXTS = {".png", ".jpg", ".jpeg"}
+
+def _scan_baseimg_registry(base_dir: Path) -> dict[str, list[str]]:
+    """
+    Recursively scan base_dir for leaf directories (those containing image files directly).
+    Keys are relative paths from base_dir, e.g. "melee", "range/medieval", "range/firearm".
+    Icon is stored as "<key>/<filename>" so the full path resolves to baseimg_128/<key>/<filename>.
+    Adding any new nested subdir automatically extends the registry on next startup.
+    """
+    registry: dict[str, list[str]] = {}
+    if not base_dir.exists():
+        return registry
+
+    def _recurse(directory: Path):
+        files = sorted(p.name for p in directory.iterdir() if p.is_file() and p.suffix.lower() in _IMG_EXTS)
+        if files:
+            key = directory.relative_to(base_dir).as_posix()  # e.g. "melee" or "range/medieval"
+            registry[key] = files
+        for child in sorted(directory.iterdir()):
+            if child.is_dir():
+                _recurse(child)
+
+    _recurse(base_dir)
+    return registry
+
+_BASEIMG_REGISTRY: dict[str, list[str]] = _scan_baseimg_registry(settings.BASEIMG_DIR)
 
 _ICON_OUTPUT_SIZE = 128
 _WHITE_THRESH     = 240   # pixels with all RGB channels >= this are treated as background
@@ -211,12 +244,15 @@ async def _call_sd(prompt: str, template_b64: str | None) -> str | None:
 _ICON_SELECT_PROMPT = ChatPromptTemplate.from_messages([
     ("system",
      "You are a weapon art director. Select the single best-matching base sprite for the given weapon.\n"
-     "You MUST choose a filename that exists EXACTLY in the available list — do not invent or modify names.\n\n"
-     "SELECTION PRIORITY (apply in order):\n"
-     "1. If any word in the weapon name appears in a filename (e.g. 'arrow' → 'arrow.png'), pick that file immediately.\n"
-     "2. Otherwise match by weapon shape/type (sword, axe, spear, bow, staff…).\n"
-     "3. Never let gameplay mechanics (pierce, burn, etc.) override the visual shape.\n\n"
-     "Available base images:\n{filenames}"),
+     "Images are organised into categories (subdirectories). You MUST return both a category and a filename "
+     "that exist EXACTLY in the available list — do not invent or modify names.\n\n"
+     "SELECTION RULES:\n"
+     "1. weapon_type='{weapon_type}': strongly prefer the matching category (e.g. 'melee' for melee weapons, "
+     "'range' for ranged). Only pick a different category if nothing in the preferred one fits at all.\n"
+     "2. Within the chosen category, match by visual shape (sword, axe, spear, bow, staff…).\n"
+     "3. If any word in the weapon name matches a filename, prefer that file.\n"
+     "4. Never let gameplay mechanics (fire, poison, pierce…) override visual shape.\n\n"
+     "Available images by category:\n{filenames}"),
     ("human",
      "Weapon name: {name}\n"
      "Visual description: {visual_manifest}\n"
@@ -238,47 +274,62 @@ class ArtistAgent:
 
     async def _composite_node(self, state: GlobalState, config: RunnableConfig | None = None) -> dict:
         """
-        Composite mode: LLM picks the best base sprite from app/data/baseimg/.
+        Composite mode: LLM picks the best base sprite from the categorised registry.
+        Images live in baseimg_128/<category>/<filename>.
+        Icon is stored as "<category>/<filename>" so debug.html resolves the full path
+        via its existing "app/data/baseimg_128/${fn}" template — no change needed there.
         Unity applies visual_stats.tint_color at runtime.
         """
         concept      = state.get("design_concept") or {}
         final_output = state.get("final_output") or {}
+        weapon_type  = concept.get("weapon_type", "melee")
 
-        # Collect available base images
-        base_images = sorted(
-            p.name for p in settings.BASEIMG_DIR.iterdir()
-            if p.suffix.lower() in {".png", ".jpg", ".jpeg"}
-        ) if settings.BASEIMG_DIR.exists() else []
-
-        if not base_images:
-            print("[Artist/Composite] ⚠️  No base images in baseimg/ — using fallback.")
+        if not _BASEIMG_REGISTRY:
+            print("[Artist/Composite] ⚠️  No base image categories found — using fallback.")
             return {"generated_icon": "weapon_axe.png", "generated_icon_b64": None}
 
-        filenames_str = "\n".join(f"  - {name}" for name in base_images)
+        # Build categorised listing for the prompt
+        options_lines: list[str] = []
+        for category, files in _BASEIMG_REGISTRY.items():
+            options_lines.append(f"[{category}]")
+            options_lines.extend(f"  - {f}" for f in files)
+        filenames_str = "\n".join(options_lines)
+
+        print(f"[Artist/Composite] Registry loaded: { {k: len(v) for k, v in _BASEIMG_REGISTRY.items()} }")
+        print(f"[Artist/Composite] weapon_type={weapon_type}, filenames_str=\n{filenames_str}")
+
+        # Determine a sane fallback (prefer weapon_type-matching category)
+        fallback_category = weapon_type if weapon_type in _BASEIMG_REGISTRY else next(iter(_BASEIMG_REGISTRY))
+        fallback_filename = _BASEIMG_REGISTRY[fallback_category][0]
 
         try:
             selection: IconSelection = await self._icon_select_chain.ainvoke({
                 "filenames":       filenames_str,
+                "weapon_type":     weapon_type,
                 "name":            final_output.get("name") or concept.get("codename", "weapon"),
                 "visual_manifest": concept.get("visual_manifest", ""),
                 "keywords":        ", ".join(concept.get("keywords", [])),
             }, config={"callbacks": make_callbacks("Artist", state.get("session_id", "default"), config)})
-            icon_filename = selection.selected_filename
-            print(f"[Artist/Composite] LLM selected: {icon_filename} | reason: {selection.reasoning}")
+
+            sel_cat  = selection.selected_category
+            sel_file = selection.selected_filename
+
+            # Validate both category and filename exist in the registry
+            if sel_cat not in _BASEIMG_REGISTRY or sel_file not in _BASEIMG_REGISTRY[sel_cat]:
+                print(f"[Artist/Composite] ⚠️  '{sel_cat}/{sel_file}' not in registry — using fallback.")
+                sel_cat, sel_file = fallback_category, fallback_filename
+
+            print(f"[Artist/Composite] LLM selected: {sel_cat}/{sel_file} | reason: {selection.reasoning}")
         except Exception as e:
             print(f"[Artist/Composite] LLM selection failed: {e} — using fallback.")
-            icon_filename = base_images[0]
+            sel_cat, sel_file = fallback_category, fallback_filename
 
-        # Validate the selected filename actually exists
-        base_path = settings.BASEIMG_DIR / icon_filename
-        if not base_path.exists():
-            print(f"[Artist/Composite] ⚠️  '{icon_filename}' not found — using first available.")
-            icon_filename = base_images[0]
-            base_path = settings.BASEIMG_DIR / icon_filename
+        icon_key  = f"{sel_cat}/{sel_file}"           # stored in weapon data, e.g. "melee/axe1_crop.png"
+        base_path = settings.BASEIMG_DIR / sel_cat / sel_file
 
         tint = (final_output.get("visual_stats") or {}).get("tint_color") or {}
         print(
-            f"[Artist/Composite] icon={icon_filename} | "
+            f"[Artist/Composite] icon={icon_key} | "
             f"tint=({tint.get('r',1):.2f},{tint.get('g',1):.2f},{tint.get('b',1):.2f},{tint.get('a',1):.2f})"
         )
 
@@ -286,7 +337,7 @@ class ArtistAgent:
         icon_b64  = base64.b64encode(png_bytes).decode("utf-8")
 
         return {
-            "generated_icon":     icon_filename,
+            "generated_icon":     icon_key,
             "generated_icon_b64": icon_b64,
         }
 
@@ -348,3 +399,5 @@ class ArtistAgent:
 
 
 artist_agent = ArtistAgent()
+
+

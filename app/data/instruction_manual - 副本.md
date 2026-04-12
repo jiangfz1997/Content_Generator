@@ -1,0 +1,358 @@
+# GLOBAL DESIGN CONSTITUTION (STRICT RULES)
+
+### THE CORE CONSTITUTION (Design Principles)
+1. **Primitives are Physics, Payloads are Chemistry**: Primitives (OPs) define the raw laws of the engine. Payloads are the intended 'reactions' created by combining those laws.
+2. **Intent-Driven Architecture**: Never use a Primitive just because it's available; use it only if it serves the specific tactical role of the chosen Payload.
+3. **Atomic Integrity**: Do not attempt to bypass the logic of a Payload. If a Payload requires a Timer to function, the weapon's motion must accommodate that duration.
+
+
+---
+
+# Engine Tactical Manual
+**Overview:** The combat engine utilizes a series of primitives to create complex and varied payload behaviors. OP_MODIFY_HP's damage and healing functions are scaled by either the weapon's damage or a flat value, depending on the 'source' parameter. OP_SPAWN_PROJECTILE allows the creation of projectiles using the ProjectileDatabase, enabling ranged attacks and area effects.
+
+### Atomic Capabilities (Index):
+- OP_APPLY_FORCE: Applies a physical force to a target or self. (Params: magnitude sets force strength; target_type selects self or target; direction_mode determines knockback direction.)
+- OP_MODIFY_HP: Modifies target or self's HP based on value and source. (Params: value is positive; source determines weapon_multiplier or absolute; category sets damage, heal, or self_damage; tag names the element.)
+- OP_MODIFY_SPEED: Adjusts target or self's speed with specified mode and duration. (Params: value modifies speed; target_type selects self or target; mode sets Set, Add, or Multiplier; duration controls buff/debuff lifespan.)
+- OP_SPAWN_PROJECTILE: Spawns a projectile from ProjectileDatabase with specified count and spread. (Params: projectile_id references ProjectileDatabase; count sets number of projectiles; spread_angle controls multi-shot spread.)
+- OP_TIMER: Executes nested actions repeatedly over a set duration. (Params: duration sets total lifespan; interval sets tick time; actions contains nested primitive configurations.)
+- OP_ARC: Moves weapon in an arc along a circular path. (Params: radius sets orbit size; start_angle/end_angle define arc; curve controls motion curve; time_start/time_end manage timing.)
+- OP_MOVE: Moves weapon from start to end position. (Params: start/end define movement path; curve controls motion curve; time_start/time_end manage timing.)
+- OP_ROTATE: Rotates weapon between start and end angles. (Params: start/end define rotation angles; curve controls motion curve; time_start/time_end manage timing.)
+- OP_SCALE: Scales weapon from start to end size. (Params: start/end define scale; curve controls motion curve; time_start/time_end manage timing.)
+
+### Motion Capabilities (Index):
+- OP_ARC: Moves weapon in an arc along a circular path. (Params: radius sets orbit size; start_angle/end_angle define arc; curve controls motion curve; time_start/time_end manage timing.)
+- OP_MOVE: Moves weapon from start to end position. (Params: start/end define movement path; curve controls motion curve; time_start/time_end manage timing.)
+- OP_ROTATE: Rotates weapon between start and end angles. (Params: start/end define rotation angles; curve controls motion curve; time_start/time_end manage timing.)
+- OP_SCALE: Scales weapon from start to end size. (Params: start/end define scale; curve controls motion curve; time_start/time_end manage timing.)
+
+## Payload Catalog
+### payload_dot_bleed
+- Tactical Intent: Sustained bleed damage over a short duration, effective for debuffing target health.
+- Logic: OP_TIMER fires OP_MODIFY_HP (0.3× weapon damage, bleed tag) every 0.5s for 3s.
+
+### payload_dot_dark_poison
+- Tactical Intent: Poison DoT that slows the target and increases damage taken, useful for control and debuffing.
+- Logic: OP_TIMER fires OP_MODIFY_HP (0.25× weapon damage, dark poison tag) every 1s for 5s.
+
+### payload_dot_fire
+- Tactical Intent: Sustained fire damage over a moderate duration, effective for continuous area denial.
+- Logic: OP_TIMER fires OP_MODIFY_HP (0.25× weapon damage, fire tag) every 1s for 5s.
+
+### payload_dot_poison
+- Tactical Intent: Sustained poison damage over a longer duration, ideal for prolonged engagements and debuffing.
+- Logic: OP_TIMER fires OP_MODIFY_HP (0.2× weapon damage, poison tag) every 1s for 6s.
+
+### payload_drain
+- Tactical Intent: Magic damage drain with healing for the caster, useful for resource management and healing on the fly.
+- Logic: OP_MODIFY_HP (0.6× weapon damage, magic tag) reduces target HP and OP_MODIFY_HP (5, absolute) heals the caster.
+
+### payload_freeze
+- Tactical Intent: Stuns the target, preventing movement and enabling flanking or crowd control.
+- Logic: OP_MODIFY_SPEED (0.1×, target, Multiplier) slows the target to 10% of its speed for 2s.
+
+### payload_haste
+- Tactical Intent: Burst of speed for quick movement or hit-and-run tactics.
+- Logic: OP_MODIFY_SPEED (2×, self, Multiplier) increases the wielder's speed to double for 3s.
+
+### payload_knockback
+- Tactical Intent: Knockback effect to disrupt enemy positioning and create space.
+- Logic: OP_APPLY_FORCE (18, target, FromHitPoint) knocks the target away from the point of impact.
+
+### payload_magic_bolt
+- Tactical Intent: Instant burst of magic damage, effective for ranged engagements and debuffing.
+- Logic: OP_MODIFY_HP (0.8× weapon damage, magic tag) deals instant magic damage to the target.
+
+### payload_pull
+- Tactical Intent: Pulls the target closer, useful for controlling enemy movements or closing distance.
+- Logic: OP_APPLY_FORCE (-15, target, FromHitPoint) pulls the target toward the caster.
+
+### payload_recoil_dash
+- Tactical Intent: Recoil dash for hit-and-run tactics or to escape dangerous situations.
+- Logic: OP_APPLY_FORCE (20, self, SourceForward) propels the wielder backward on hit.
+
+### payload_sacrifice
+- Tactical Intent: Fixed damage to the wielder for various effects, such as activating special abilities or creating resource penalties.
+- Logic: OP_MODIFY_HP (8, absolute, self_damage) reduces the wielder's HP.
+
+### payload_shadow_poison
+- Tactical Intent: Poison burst with pull effect, creating area denial and debuffing targets over time.
+- Logic: OP_APPLY_FORCE (-5, target, FromHitPoint) pulls the target, OP_MODIFY_HP (0.5× weapon damage, poison tag) deals initial damage, and OP_TIMER fires OP_MODIFY_HP (0.1× weapon damage, poison tag) every 0.5s for 4s.
+
+### payload_shoot_generic
+- Tactical Intent: Generic projectile shot, effective for ranged attacks and area effects.
+- Logic: OP_SPAWN_PROJECTILE (@weapon.projectile_id) spawns a projectile based on the weapon's projectile ID.
+
+### payload_slow
+- Tactical Intent: Reduces enemy movement speed, useful for crowd control and enabling flanking.
+- Logic: OP_MODIFY_SPEED (0.5×, target, Multiplier) reduces the target's speed to 50% for 3s.
+
+### payload_strike
+- Tactical Intent: Instant burst of physical damage, effective for melee attacks and debuffing.
+- Logic: OP_MODIFY_HP (1.0× weapon damage, physical tag) deals instant physical damage to the target.
+
+### payload_toxic_vortex
+- Tactical Intent: Toxic area effect that pulls enemies into a localized singularity while dealing damage.
+- Logic: OP_TIMER fires OP_APPLY_FORCE (12, target, 180 degrees) pulls enemies inward, OP_MODIFY_HP (0.2× weapon damage, poison tag) deals poison damage every 0.5s for 4s.
+
+### payload_venom_tether
+- Tactical Intent: Toxic area effect that pulls enemies into a localized singularity while dealing damage.
+- Logic: OP_TIMER fires OP_APPLY_FORCE (12, target, 180 degrees) pulls enemies inward, OP_MODIFY_HP (0.2× weapon damage, poison tag) deals poison damage every 0.5s for 4s.
+
+
+---
+
+# Weapon Implementation Reference
+# Weapon JSON Schema
+> Updated: 2026-03-15
+
+Weapon definitions live in `Assets/StreamingAssets/Config/Weapons/*.json`.
+Each file describes one weapon and is loaded by `WeaponDatabase` at startup.
+
+---
+
+## Top-Level Structure
+
+```json
+{
+  "id":           "weapon_pistol",
+  "name":         "Pistol",
+  "icon":         "weapon_pistol.png",
+  "stats":        { ... },
+  "visual_stats": { ... },
+  "motions":      [ ... ],
+  "abilities":    { ... }
+}
+```
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | `string` | Unique identifier. Must match the filename (e.g. `weapon_pistol.json` → `"weapon_pistol"`). |
+| `name` | `string` | Display name shown in UI. |
+| `icon` | `string` | Sprite filename inside `Resources/Weapons/`. Defaults to `"{id}.png"` if omitted. |
+| `stats` | `object` | Numeric parameters controlling timing, range, and base power. See table below. |
+| `visual_stats` | `object` | Visual sizing and pivot configuration. See table below. |
+| `motions` | `array` | List of motion primitives that animate the weapon during an attack. See **MotionPrimitivesSchema.md**. |
+| `abilities` | `object` | Maps trigger keys to lists of payload IDs. See **Abilities** section below. |
+
+---
+
+## `stats` Fields
+
+| Field | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `range` | `float` | `1.5` | Collider activation distance in world units. Controls how far the weapon hitbox extends from the player. |
+| `duration` | `float` | `0.5` | Total attack animation duration in seconds. Recommended range: **0.3 – 0.6**. Drives the coroutine length in `WeaponInstance`. |
+| `cooldown` | `float` | `0.5` | Minimum time in seconds between attacks. Currently commented out in `WeaponInstance` (intentional — reserved for future use). |
+| `base_damage` | `float` | `10` | The weapon's raw damage output at `design_level`. Used in the scaling formula: `final_damage = base_damage × √(player_level / design_level)`. |
+| `design_level` | `int` | `1` | The player level this weapon is balanced for. A player at exactly `design_level` will deal exactly `base_damage`. Below → weaker, above → stronger. |
+| `hit_start` | `float` | `0.2` | Normalized time [0, 1] when the hitbox collider is enabled. Use `0` for ranged weapons that never use the physical collider. |
+| `hit_end` | `float` | `0.8` | Normalized time [0, 1] when the hitbox collider is disabled. Use `0` (same as `hit_start`) for ranged weapons. |
+| `projectile_id` | `string` | `""` | **Ranged only.** ID of the projectile to fire (e.g. `"projectile_bullet"`). Must match an entry in `ProjectileDatabase`. Leave empty or omit for melee weapons. |
+| `projectile_count` | `int` | `1` | **Ranged only.** Number of projectiles fired per attack. `1` = pistol, `5` = shotgun. |
+| `spread_angle` | `float` | `0.0` | **Ranged only.** Total spread in degrees when `projectile_count > 1`. E.g. `30` fans projectiles across a 30° arc. Ignored when `projectile_count` is `1`. |
+
+### Damage Scaling Reference
+
+| `design_level` | Suggested `base_damage` | Intended Role |
+| :--- | :--- | :--- |
+| 1 | 10 – 14 | Starter weapon |
+| 3 | 14 – 18 | Early game |
+| 5 | 18 – 22 | Mid game |
+| 7 | 22 – 28 | Late mid game |
+| 10 | 28 – 35 | End game |
+| 12+ | 35 – 45 | Boss / unique |
+
+---
+
+## `visual_stats` Fields
+
+| Field | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `world_length` | `float` | `1.0` | **Currently not read by code** — `WeaponInstance._targetWorldLength` is hardcoded to `1.0`. Reserved for future use. Intended to set the weapon sprite's longest dimension in world units via `ApplySizeNormalization`. |
+| `pivot` | `object {x, y}` | `{x:0.5, y:0.0}` | The sprite's pivot point in normalized coordinates used when loading the sprite. Controls the rotation anchor. `x=0` is the left/handle end, `x=1` is the tip. Typical values: `{x:0.1, y:0}` for a grip-pivoting sword. |
+
+---
+
+## `abilities` Fields
+
+Maps **trigger keys** to ordered lists of payload IDs. Each payload is defined separately in `Assets/StreamingAssets/Config/Payloads/*.json`.
+
+```json
+"abilities": {
+  "on_hit":    ["payload_fire_burn"],
+  "on_attack": ["payload_shoot_bullet"],
+  "on_equip":  []
+}
+```
+
+| Trigger Key | When it fires | Typical use |
+| :--- | :--- | :--- |
+| `on_hit` | When the weapon's hitbox collider enters an enemy collider (inside the `hit_start`–`hit_end` window). `ctx.Target` = the enemy hit. | Melee damage, knockback, status effects. |
+| `on_attack` | At the very start of `AttackRoutine`, before any animation. `ctx.Target` = `null`. | Spawning projectiles (ranged weapons). |
+| `on_equip` | When the player equips this weapon. | Passive stat buffs, visual effects. |
+
+**Rules:**
+- Each trigger key maps to an array of payload ID strings.
+- Payloads in the array execute **in order**.
+- An empty array `[]` is valid and means no effects fire for that trigger.
+- Omitting a trigger key is equivalent to an empty array.
+- For ranged weapons: set `hit_start: 0, hit_end: 0` to disable the physical hitbox entirely and rely solely on `on_attack`.
+
+---
+
+## Full Example — Melee Weapon
+
+```json
+{
+  "id": "weapon_axe",
+  "name": "Mjolnir Prototype",
+  "stats": {
+    "range": 1.5,
+    "duration": 0.5,
+    "cooldown": 0.4,
+    "base_damage": 12,
+    "design_level": 1,
+    "hit_start": 0.2,
+    "hit_end": 0.85
+  },
+  "motions": [
+    { "primitive_id": "OP_ROTATE", "params": { "start": 90, "end": -90, "curve": "EaseIn" } },
+    { "primitive_id": "OP_MOVE",   "params": { "start": {"x":0,"y":0}, "end": {"x":0.5,"y":0}, "curve": "PingPong" } }
+  ],
+  "abilities": {
+    "on_hit":    ["payload_fire_burn"],
+    "on_attack": [],
+    "on_equip":  []
+  }
+}
+```
+
+## Full Example — Ranged Weapon
+
+```json
+{
+  "id": "weapon_pistol",
+  "name": "Pistol",
+  "stats": {
+    "range": 1.0,
+    "duration": 0.3,
+    "cooldown": 0.5,
+    "base_damage": 15,
+    "design_level": 3,
+    "hit_start": 0,
+    "hit_end": 0,
+    "projectile_id": "projectile_bullet",
+    "projectile_count": 1,
+    "spread_angle": 0.0
+  },
+  "motions": [
+    { "primitive_id": "OP_MOVE", "params": { "start": {"x":0,"y":0}, "end": {"x":-0.3,"y":0}, "curve": "EaseOut" } }
+  ],
+  "abilities": {
+    "on_hit":    [],
+    "on_attack": ["payload_shoot_generic"],
+    "on_equip":  []
+  }
+}
+```
+
+
+---
+
+# Projectile Implementation Reference
+# Projectile Database
+> Generated on: 2026-03-17 16:25:04
+> Total entries: 6
+
+## `projectile_bullet`
+- **Name:** Bullet
+
+### Stats
+| Field | Value |
+| :--- | :--- |
+| `speed` | `14` |
+| `lifetime` | `3` |
+| `penetration` | `0` |
+
+### Abilities
+- **on_hit:** `payload_bullet_hit`
+
+---
+## `projectile_explosion`
+- **Name:** Explosion
+
+### Stats
+| Field | Value |
+| :--- | :--- |
+| `speed` | `0` |
+| `lifetime` | `0.08` |
+| `penetration` | `99` |
+| `collider_radius` | `2.5` |
+
+### Abilities
+- **on_hit:** `payload_explosion_damage`
+
+---
+## `projectile_lightning_poison`
+- **Name:** Lightning Poison Dart
+
+### Stats
+| Field | Value |
+| :--- | :--- |
+| `speed` | `10` |
+| `lifetime` | `4` |
+| `penetration` | `0` |
+| `collider_radius` | `0.1` |
+
+### Abilities
+- **on_hit:** `payload_dot_poison`, `payload_slow`
+
+---
+## `projectile_plasma_bolt`
+- **Name:** Plasma Bolt
+
+### Stats
+| Field | Value |
+| :--- | :--- |
+| `speed` | `18` |
+| `lifetime` | `2` |
+| `penetration` | `99` |
+| `collider_radius` | `0.1` |
+
+### Abilities
+- **on_hit:** `payload_magic_bolt`, `payload_dot_fire`
+
+---
+## `projectile_rocket`
+- **Name:** Rocket
+
+### Stats
+| Field | Value |
+| :--- | :--- |
+| `speed` | `10` |
+| `lifetime` | `4` |
+| `penetration` | `0` |
+| `collider_radius` | `0.15` |
+
+### Abilities
+- **on_hit:** `payload_rocket_impact`
+
+---
+## `projectile_water_shadow`
+- **Name:** Water Shadow Projectile
+
+### Stats
+| Field | Value |
+| :--- | :--- |
+| `speed` | `12` |
+| `lifetime` | `3.5` |
+| `penetration` | `0` |
+| `collider_radius` | `0.1` |
+
+### Abilities
+- **on_hit:** `payload_dot_poison`, `payload_dot_dark_poison`
+
+---
